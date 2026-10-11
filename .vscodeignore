@@ -13,3 +13,6 @@ node_modules/pdfjs-dist/build/pdf.sandbox*
 node_modules/pdfjs-dist/build/pdf.worker.entry.js
 .vscode/**
 media/logo.svg
+docs/**
+.gitignore
+test/**

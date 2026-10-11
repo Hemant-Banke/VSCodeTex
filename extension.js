@@ -256,7 +256,9 @@ function parseLog(logText, rootFile, rootDir) {
   const add = (file, line, message, severity) => {
     file = file ? path.resolve(rootDir, file) : rootFile;
     message = message.trim();
-    const key = `${file}:${line}:${message}:${severity}`;
+    // The same error can come from both the .log and the compiler's console output, with and
+    // without a trailing period or the offending-text suffix.
+    const key = `${file}:${line}:${message.replace(/ — .*$/, '').replace(/\.$/, '')}:${severity}`;
     if (seen.has(key)) return;
     seen.add(key);
     items.push({ file, line: Math.max(1, line || 1), message, severity });

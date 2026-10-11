@@ -2,9 +2,17 @@
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview",
   "description": "Overleaf-style side-by-side LaTeX preview with SyncTeX, plus two-way Overleaf sync over Git.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "publisher": "hemant",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hemant-Banke/VSCodeTex.git"
+  },
+  "homepage": "https://github.com/Hemant-Banke/VSCodeTex#readme",
+  "bugs": {
+    "url": "https://github.com/Hemant-Banke/VSCodeTex/issues"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -207,10 +215,13 @@
     }
   },
   "scripts": {
-    "package": "vsce package"
+    "package": "vsce package --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/main/ --skip-license"
   },
   "dependencies": {
     "pdfjs-dist": "3.11.174"
   },
-  "icon": "media/logo.png"
+  "icon": "media/logo.png",
+  "devDependencies": {
+    "@vscode/vsce": "^4.0.0"
+  }
 }

@@ -157,7 +157,10 @@ class SyncTex {
           if (delta < bestDelta || (delta === bestDelta && (pageNo < best.page || (pageNo === best.page && r.y < best.ry)))) {
             bestDelta = delta;
             // Highlight the whole typeset line the record sits on.
-            const box = kind === 'leaves' && r.parent && r.parent.type === '(' && r.parent.w > 0 ? r.parent : r;
+            // The outermost horizontal box above the record is the typeset line (this climbs out
+            // of fractions, scripts and other nested boxes in display math).
+            let box = r;
+            for (let a = r.parent; a; a = a.parent) if (a.type === '(' && a.w > 0) box = a;
             const h = Math.max(box.h, 7);
             best = { page: pageNo, x: box.x, w: box.w, ry: r.y, y: box.y - h, h: h + Math.max(box.d, 2) };
           }
