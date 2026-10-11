@@ -56,19 +56,18 @@ On Linux, `sudo apt install texlive-full latexmk` works. On Windows, install MiK
 
 ### 2. Install the extension
 
-The extension ships as a `.vsix` file. In VS Code, open the **Extensions** view (⇧⌘X), click the **`···`** menu at the top of the view and choose **Install from VSIX…**, then pick `tex-side-preview-<version>.vsix`.
-
-<img src="docs/images/install-vsix.png" alt="The Extensions view's ··· menu with Install from VSIX…" width="520">
-
-From the command line:
-
-```sh
-code --install-extension tex-side-preview-0.4.1.vsix
-```
-
-Once it's installed, search for **TeX Side Preview** in the Extensions view to see it, or type `@installed tex` to filter:
+In VS Code, open the **Extensions** view (⇧⌘X / Ctrl+Shift+X), search for **TeX Side Preview**, and click **Install**.
 
 ![The extension's page in the Extensions view](docs/images/extension-page.png)
+
+Other ways to install:
+
+- **Quick Open:** press ⌘P (Ctrl+P), paste `ext install hemant.tex-side-preview` and press Enter.
+- **Command line:** run `code --install-extension hemant.tex-side-preview`.
+- **Cursor, VSCodium, Windsurf:** search for **TeX Side Preview** in their Extensions view; it's published on [Open VSX](https://open-vsx.org/extension/hemant/tex-side-preview).
+- **From a `.vsix` file:** in the Extensions view, open the **`···`** menu → **Install from VSIX…** and pick the file.
+
+  <img src="docs/images/install-vsix.png" alt="The Extensions view's ··· menu with Install from VSIX…" width="520">
 
 ---
 

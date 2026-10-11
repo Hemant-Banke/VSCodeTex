@@ -2,7 +2,7 @@
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview",
   "description": "Overleaf-style side-by-side LaTeX preview with SyncTeX, plus two-way Overleaf sync over Git.",
-  "version": "0.4.1",
+  "version": "1.0.0",
   "publisher": "hemant",
   "license": "MIT",
   "repository": {
@@ -23,9 +23,22 @@
   "keywords": [
     "latex",
     "tex",
+    "overleaf",
     "pdf",
     "preview",
-    "overleaf"
+    "pdf preview",
+    "synctex",
+    "live preview",
+    "latexmk",
+    "tectonic",
+    "pdflatex",
+    "xelatex",
+    "bibtex",
+    "academic",
+    "paper",
+    "thesis",
+    "overleaf sync",
+    "git"
   ],
   "main": "./extension.js",
   "activationEvents": [
@@ -64,7 +77,7 @@
       },
       {
         "command": "texPreview.overleaf.clone",
-        "title": "Clone Project\u2026",
+        "title": "Clone Project…",
         "category": "Overleaf",
         "icon": "$(repo-clone)"
       },
@@ -76,12 +89,12 @@
       },
       {
         "command": "texPreview.overleaf.menu",
-        "title": "Sync Actions\u2026",
+        "title": "Sync Actions…",
         "category": "Overleaf"
       },
       {
         "command": "texPreview.overleaf.setToken",
-        "title": "Set Git Token\u2026",
+        "title": "Set Git Token…",
         "category": "Overleaf"
       }
     ],
@@ -215,13 +228,21 @@
     }
   },
   "scripts": {
-    "package": "vsce package --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/main/ --skip-license"
+    "package": "vsce package --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/main/",
+    "publish": "vsce publish --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/main/",
+    "publish:ovsx": "npm run package && ovsx publish *.vsix"
   },
   "dependencies": {
     "pdfjs-dist": "3.11.174"
   },
   "icon": "media/logo.png",
   "devDependencies": {
-    "@vscode/vsce": "^4.0.0"
-  }
+    "@vscode/vsce": "^4.0.0",
+    "ovsx": "^1.2.0"
+  },
+  "galleryBanner": {
+    "color": "#1d2430",
+    "theme": "dark"
+  },
+  "pricing": "Free"
 }
