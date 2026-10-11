@@ -3,7 +3,7 @@
   "displayName": "TeX Side Preview",
   "description": "Overleaf-style side-by-side LaTeX preview with SyncTeX, plus two-way Overleaf sync over Git.",
   "version": "1.0.0",
-  "publisher": "hemant",
+  "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {
     "type": "git",
