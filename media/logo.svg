@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3cb46a"/>
+      <stop offset="1" stop-color="#127a3d"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#06331a" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+
+  <!-- editor pane -->
+  <g filter="url(#shadow)">
+    <rect x="34" y="54" width="112" height="148" rx="14" fill="#1d2430"/>
+    <rect x="34" y="54" width="112" height="22" rx="14" fill="#2a3341"/>
+    <rect x="34" y="66" width="112" height="10" fill="#2a3341"/>
+    <circle cx="50" cy="65" r="4" fill="#ff6b5f"/><circle cx="63" cy="65" r="4" fill="#ffc23d"/><circle cx="76" cy="65" r="4" fill="#3fd06b"/>
+    <g stroke-linecap="round" stroke-width="7">
+      <path d="M50 96H74" stroke="#c792ea"/><path d="M82 96H112" stroke="#82aaff"/>
+      <path d="M58 114H100" stroke="#a6b0c3"/>
+      <path d="M58 132H86" stroke="#a6b0c3"/><path d="M94 132H118" stroke="#f78c6c"/>
+      <path d="M58 150H108" stroke="#a6b0c3"/>
+      <path d="M50 168H72" stroke="#c792ea"/><path d="M80 168H104" stroke="#82aaff"/>
+    </g>
+  </g>
+
+  <!-- PDF page -->
+  <g filter="url(#shadow)">
+    <path d="M118 40H196L222 66V214Q222 222 214 222H126Q118 222 118 214Z" fill="#ffffff"/>
+    <path d="M196 40V58Q196 66 204 66H222Z" fill="#d6e4dc"/>
+  </g>
+  <!-- TeX logo, lowered E -->
+  <g fill="#1d2430" font-family="'Latin Modern Roman','Computer Modern',Georgia,'Times New Roman',serif" font-size="46">
+    <text x="128" y="112">T</text>
+    <text x="151" y="123">E</text>
+    <text x="178" y="112">X</text>
+  </g>
+  <g stroke="#c4cdc8" stroke-width="6" stroke-linecap="round">
+    <path d="M134 146H206"/><path d="M134 162H206"/><path d="M134 178H206"/><path d="M134 194H182"/>
+  </g>
+</svg>

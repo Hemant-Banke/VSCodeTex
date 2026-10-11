@@ -1,0 +1,4 @@
+node_modules/
+.texbuild/
+*.vsix
+test/

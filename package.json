@@ -1,0 +1,216 @@
+{
+  "name": "tex-side-preview",
+  "displayName": "TeX Side Preview",
+  "description": "Overleaf-style side-by-side LaTeX preview with SyncTeX, plus two-way Overleaf sync over Git.",
+  "version": "0.4.0",
+  "publisher": "hemant",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "latex",
+    "tex",
+    "pdf",
+    "preview",
+    "overleaf"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:latex",
+    "onLanguage:tex",
+    "workspaceContains:**/*.tex",
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "texPreview.open",
+        "title": "Open TeX Preview to the Side",
+        "category": "TeX",
+        "icon": {
+          "light": "media/preview-light.svg",
+          "dark": "media/preview-dark.svg"
+        }
+      },
+      {
+        "command": "texPreview.compile",
+        "title": "Recompile",
+        "category": "TeX",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "texPreview.showLog",
+        "title": "Show Compile Log",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.syncToPdf",
+        "title": "Jump to Location in PDF",
+        "category": "TeX",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "texPreview.overleaf.clone",
+        "title": "Clone Project\u2026",
+        "category": "Overleaf",
+        "icon": "$(repo-clone)"
+      },
+      {
+        "command": "texPreview.overleaf.syncNow",
+        "title": "Sync Now",
+        "category": "Overleaf",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "texPreview.overleaf.menu",
+        "title": "Sync Actions\u2026",
+        "category": "Overleaf"
+      },
+      {
+        "command": "texPreview.overleaf.setToken",
+        "title": "Set Git Token\u2026",
+        "category": "Overleaf"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "texPreview.open",
+          "when": "resourceExtname == .tex || editorLangId == latex",
+          "group": "navigation"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "texPreview.open",
+          "when": "resourceExtname == .tex",
+          "group": "1_open"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "texPreview.open",
+          "when": "resourceExtname == .tex",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "texPreview.open",
+          "when": "resourceExtname == .tex || editorLangId == latex",
+          "group": "navigation@90"
+        },
+        {
+          "command": "texPreview.syncToPdf",
+          "when": "resourceExtname == .tex || editorLangId == latex",
+          "group": "navigation@91"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "texPreview.open",
+          "when": "resourceExtname == .tex || editorLangId == latex"
+        },
+        {
+          "command": "texPreview.syncToPdf",
+          "when": "resourceExtname == .tex || editorLangId == latex"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "texPreview.open",
+        "key": "ctrl+alt+v",
+        "mac": "cmd+alt+v",
+        "when": "editorTextFocus && (resourceExtname == .tex || editorLangId == latex)"
+      },
+      {
+        "command": "texPreview.compile",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorTextFocus && (resourceExtname == .tex || editorLangId == latex)"
+      },
+      {
+        "command": "texPreview.syncToPdf",
+        "key": "ctrl+alt+j",
+        "mac": "cmd+alt+j",
+        "when": "editorTextFocus && (resourceExtname == .tex || editorLangId == latex)"
+      }
+    ],
+    "configuration": {
+      "title": "TeX Side Preview",
+      "properties": {
+        "texPreview.engine": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "latexmk",
+            "tectonic",
+            "pdflatex",
+            "xelatex",
+            "lualatex"
+          ],
+          "default": "auto",
+          "description": "Compiler to use. 'auto' picks the first available of latexmk, tectonic, pdflatex."
+        },
+        "texPreview.latexmkEngine": {
+          "type": "string",
+          "enum": [
+            "pdf",
+            "xelatex",
+            "lualatex"
+          ],
+          "default": "pdf",
+          "description": "Engine latexmk drives (-pdf, -xelatex or -lualatex)."
+        },
+        "texPreview.outDir": {
+          "type": "string",
+          "default": ".texbuild",
+          "description": "Folder (relative to the root .tex file) for the PDF and auxiliary files. Use '.' to build next to the source."
+        },
+        "texPreview.compileOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Recompile whenever a .tex/.bib/.sty/.cls file is saved."
+        },
+        "texPreview.extraPath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra directories to search for TeX binaries (added before the default macOS/Linux TeX locations)."
+        },
+        "texPreview.overleaf.autoSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Two-way sync for folders cloned from Overleaf via Git: push on save, pull on a timer and when the window regains focus."
+        },
+        "texPreview.overleaf.pullInterval": {
+          "type": "number",
+          "default": 60,
+          "minimum": 15,
+          "description": "Seconds between checks for changes made on Overleaf."
+        },
+        "texPreview.overleaf.pushDelay": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "description": "Seconds to wait after a save before pushing, so quick successive saves go up as one commit."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "pdfjs-dist": "3.11.174"
+  },
+  "icon": "media/logo.png"
+}
