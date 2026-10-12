@@ -1,10 +1,20 @@
 # TeX Side Preview
 
-**Overleaf-style LaTeX editing inside VS Code.** Your source is on the left and the PDF on the right. Save the file and the PDF re-renders in place. Double-click the PDF to jump to the source, links work, text can be copied, and the project can sync both ways with Overleaf.
+**Overleaf-style LaTeX writing, previewing and reviewing, inside VS Code.**
 
-It feels like part of VS Code rather than something bolted on. The LaTeX help works through VS Code's own features: suggestions, hovers, Outline, folding, Format Document, the Problems panel, Expand Selection and the status bar. The only addition is a **Symbols** palette in the bottom panel, which appears only while a LaTeX file is open.
+Write on the left and the PDF updates on the right every time you save. Click between the source and the PDF in either direction. Get suggestions for citations, labels and commands, and see math, figures and references rendered on hover. Review with co-authors through comments and tracked changes, and keep the project in sync with Overleaf both ways.
+
+It feels like part of VS Code rather than something bolted on. Everything works through VS Code's own features: suggestions, hovers, the Outline, comment threads, Format Document, the Problems panel and the status bar. Your LaTeX stays plain LaTeX, with no review markup or extra packages added.
 
 ![The numbered Outline, tracked changes and a comment thread in the editor, the live PDF preview, and the word count and Review items in the status bar](docs/images/feature-overview.png)
+
+### Quick start
+
+1. Install a LaTeX distribution (TeX Live, MacTeX or MiKTeX) or [tectonic](https://tectonic-typesetting.github.io), and this extension.
+2. Open a `.tex` file and click the **T<sub>E</sub>X** button at the top right of the editor, or press ⌥⌘V (Ctrl+Alt+V).
+3. Edit and save. The PDF refreshes beside your source.
+
+To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([details](#overleaf-sync)). To review, press ⌃L R (Alt+L R) for Track Changes or ⌃L K (Alt+L K) to comment on the selection ([details](#comments-and-tracked-changes)).
 
 **Contents**
 
@@ -36,24 +46,34 @@ It feels like part of VS Code rather than something bolted on. The LaTeX help wo
 
 ## Features at a glance
 
+**Preview**
+
 | | |
 |---|---|
-| 🖥️ **Side-by-side preview** | The PDF opens next to your source, the way Overleaf shows it. |
-| 💾 **Recompile on save** | Press ⌘S and the PDF refreshes, keeping your scroll position. |
-| 🧭 **SyncTeX, both directions** | Double-click the PDF to jump to the source line, or press ⌘⌥J to jump from the source into the PDF. |
-| 🔗 **Working links** | `\ref`, `\cite`, contents and footnote links scroll inside the PDF; URLs open in your browser. |
-| ✂️ **Select and copy** | Drag across text in the PDF and press ⌘C. |
-| 🚨 **Clickable errors** | Errors are listed above the PDF and in the Problems panel; the last good PDF stays visible. |
-| ☁️ **Two-way Overleaf sync** | Saves are pushed, Overleaf changes are pulled, and conflicts open in VS Code's merge editor. |
-| 💡 **Suggestions** | `\cite` keys from your `.bib` files, `\ref` labels, commands, environments, file paths and packages. |
-| 🔍 **Hover previews** | Rendered math, citation details, referenced equations, figures and package links. |
-| 🗂️ **Outline and folding** | Sections, figures and tables in the Outline view and breadcrumbs; fold sections and environments. |
-| ✍️ **Editing helpers** | Bold or italicise the selection, wrap it in an environment, continue `\item` lists, close environments. |
-| 🧹 **Format and lint** | Format Document for `.tex` and `.bib`, warnings for duplicate labels, optional ChkTeX. |
+| 🖥️ **Side-by-side preview** | The PDF opens next to your source and refreshes when you save, keeping your place. |
+| 🧭 **SyncTeX, both directions** | Double-click the PDF to jump to the source, or press ⌥⌘J to jump from the source into the PDF. |
+| 🔗 **A real PDF viewer** | Working links, text selection and copy, zoom, a Sections menu, and dark pages (◐). |
+| 🌐 **Browser and external viewers** | The same live preview in a browser tab, or the PDF in your own viewer. |
+| 🚨 **Clickable errors** | Listed above the PDF and in the Problems panel; the last good PDF stays visible. |
+
+**Writing**
+
+| | |
+|---|---|
+| 💡 **Suggestions** | `\cite` keys, `\ref` labels with their numbers, 220+ commands with their symbols, environments, files and packages. |
+| 🔍 **Hover previews** | Rendered math, citation details, referenced equations, figure thumbnails and package links. |
 | 🔣 **Symbol palette** | Click to insert Greek letters, relations, arrows, accents, matrices, figures and tables. |
-| 🌐 **Preview in the browser** | The same live preview in a browser tab, still synced with the editor. |
-| 🔢 **Word count** | Words in the status bar; characters and per-file counts one click away. |
-| 💬 **Comments and tracked changes** | Review together like on Overleaf, with no markup added to your LaTeX; shared through the Overleaf or Git sync. |
+| ✍️ **Editing keys** | Bold, italic, inline math, surround with a command or environment, promote/demote headings, `\item` lists. |
+| 🗂️ **Outline** | Headings numbered as in the PDF, plus figures, tables and theorems; folding and Expand Selection. |
+| 🧹 **Format, lint and count** | Format Document for `.tex` and `.bib`, duplicate-label warnings, optional ChkTeX, and a word count in the status bar. |
+
+**Working together**
+
+| | |
+|---|---|
+| 💬 **Comments** | Threads on any passage, with replies and resolve, in VS Code's Comments UI. |
+| ✏️ **Tracked changes** | Edits become suggestions that anyone can accept or reject, as on Overleaf. |
+| ☁️ **Two-way Overleaf sync** | Saves are pushed, Overleaf changes are pulled, and comments and suggestions travel with the project. |
 
 ---
 
