@@ -7,6 +7,13 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { SyncTex } = require('./synctex');
 const overleaf = require('./overleaf');
+const project = require('./project');
+const { searchPath, which } = require('./tools');
+const { CompletionProvider, HoverProvider } = require('./language');
+const structure = require('./structure');
+const editing = require('./editing');
+const palette = require('./palette');
+const { BrowserServer } = require('./server');
 
 /** @type {Map<string, Preview>} keyed by root .tex fsPath */
 const previews = new Map();
@@ -14,15 +21,20 @@ let output;
 let diagnostics;
 let statusItem;
 let extensionUri;
+let browserServer;
 
-const WATCHED_EXT = new Set(['.tex', '.bib', '.sty', '.cls', '.ltx', '.bst', '.tikz']);
+const WATCHED_EXT = new Set(['.tex', '.bib', '.sty', '.cls', '.ltx', '.bst', '.tikz', '.rnw', '.jnw']);
+const ROOT_EXT = new Set(['.tex', '.rnw', '.jnw']);
+const AUX_EXT = /\.(aux|bbl|blg|bcf|run\.xml|fdb_latexmk|fls|log|out|toc|lof|lot|loa|nav|snm|vrb|xdv|dvi|synctex(\.gz)?|synctex\(busy\)|idx|ind|ilg|glo|gls|glg|ist|acn|acr|alg|thm|brf|nlo|nls)$/i;
+const LATEX = [{ language: 'latex' }, { language: 'tex' }];
 
 function activate(context) {
   extensionUri = context.extensionUri;
   output = vscode.window.createOutputChannel('TeX Preview');
   diagnostics = vscode.languages.createDiagnosticCollection('tex-preview');
   statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusItem.command = 'texPreview.showLog';
+  statusItem.command = 'texPreview.menu';
+  browserServer = new BrowserServer(context.extensionPath);
 
   context.subscriptions.push(
     output,
@@ -32,8 +44,41 @@ function activate(context) {
     vscode.commands.registerCommand('texPreview.compile', () => compileActive()),
     vscode.commands.registerCommand('texPreview.showLog', () => output.show(true)),
     vscode.commands.registerCommand('texPreview.syncToPdf', () => syncToPdf()),
-    vscode.workspace.onDidSaveTextDocument(onSave)
+    vscode.commands.registerCommand('texPreview.stop', () => activePreview()?.stop()),
+    vscode.commands.registerCommand('texPreview.clean', () => clean()),
+    vscode.commands.registerCommand('texPreview.openExternal', () => openExternal()),
+    vscode.commands.registerCommand('texPreview.openInBrowser', (opts = {}) => {
+      const ed = vscode.window.activeTextEditor;
+      const p = (ed && previewFor(ed.document.uri)) || activePreview();
+      return p ? openInBrowser(p, opts.launch !== false) : undefined;
+    }),
+    vscode.commands.registerCommand('texPreview.menu', () => showMenu()),
+    // Keep the TeX status item visible for LaTeX files so its menu is always one click away.
+    vscode.window.onDidChangeActiveTextEditor((ed) => {
+      const tex = ed && /^(la)?tex$/.test(ed.document.languageId);
+      if (tex && !statusItem.text) setStatus('$(file-pdf) TeX', 'TeX: preview, build and PDF actions');
+      else if (!tex && ed && !previews.size) statusItem.hide();
+      else if (tex) statusItem.show();
+    }),
+    { dispose: () => browserServer.dispose() },
+    vscode.workspace.onDidSaveTextDocument(onSave),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('texPreview.invertPdf')) for (const p of previews.values()) p.sendConfig();
+    }),
+    vscode.window.onDidChangeActiveColorTheme(() => {
+      for (const p of previews.values()) p.sendConfig();
+    }),
+    vscode.languages.registerCompletionItemProvider(LATEX, new CompletionProvider(), '\\', '{', ',', '@', '/'),
+    vscode.languages.registerHoverProvider(LATEX, new HoverProvider()),
+    vscode.languages.registerDocumentSymbolProvider(LATEX, new structure.SymbolProvider()),
+    vscode.languages.registerFoldingRangeProvider(LATEX, new structure.FoldingProvider()),
+    vscode.languages.registerSelectionRangeProvider(LATEX, new structure.SelectionProvider()),
+    vscode.languages.registerLinkedEditingRangeProvider(LATEX, new structure.LinkedEditingProvider())
   );
+  editing.activate(context);
+  palette.activate(context);
+  const ed = vscode.window.activeTextEditor;
+  if (ed && /^(la)?tex$/.test(ed.document.languageId)) setStatus('$(file-pdf) TeX', 'TeX: preview, build and PDF actions');
 
   // Changes pulled from Overleaf don't fire save events, so recompile affected previews here.
   overleaf.activate(context, {
@@ -54,20 +99,9 @@ function deactivate() {
 // ---------------------------------------------------------------------------
 // Root-file resolution
 
-/** Follows a `% !TEX root = ...` magic comment, otherwise returns the file itself. */
+/** The main file: `% !TEX root`, else the file itself if it has \\documentclass, else the file that includes it. */
 function resolveRoot(fsPath) {
-  let text = '';
-  try {
-    text = fs.readFileSync(fsPath, 'utf8').split(/\r?\n/, 30).join('\n');
-  } catch {
-    return fsPath;
-  }
-  const m = text.match(/^\s*%\s*!\s*TEX\s+root\s*=\s*(.+?)\s*$/im);
-  if (m) {
-    const target = path.resolve(path.dirname(fsPath), m[1]);
-    if (fs.existsSync(target)) return target;
-  }
-  return fsPath;
+  return project.findRoot(fsPath);
 }
 
 function openPreview(uri) {
@@ -76,19 +110,120 @@ function openPreview(uri) {
     if (!editor) return;
     uri = editor.document.uri;
   }
-  if (uri.scheme !== 'file' || path.extname(uri.fsPath).toLowerCase() !== '.tex') {
+  const preview = previewFor(uri);
+  if (!preview) return;
+  preview.showPanel();
+  preview.compile();
+}
+
+/** The (possibly panel-less) build for the root of `uri`, created if needed. */
+function previewFor(uri) {
+  if (uri.scheme !== 'file' || !ROOT_EXT.has(path.extname(uri.fsPath).toLowerCase())) {
     vscode.window.showWarningMessage('TeX Preview: open a .tex file first.');
-    return;
+    return null;
   }
   const root = resolveRoot(uri.fsPath);
   let preview = previews.get(root);
-  if (preview) {
-    preview.panel.reveal(vscode.ViewColumn.Beside, true);
-  } else {
+  if (!preview) {
     preview = new Preview(root);
     previews.set(root, preview);
   }
-  preview.compile();
+  return preview;
+}
+
+function activePreview() {
+  const editor = vscode.window.activeTextEditor;
+  if (editor && editor.document.uri.scheme === 'file') {
+    const p = previews.get(resolveRoot(editor.document.uri.fsPath));
+    if (p) return p;
+  }
+  return previews.size === 1 ? [...previews.values()][0] : null;
+}
+
+/** Opens the PDF in the system viewer (or texPreview.externalViewer.command) and keeps it rebuilt on save. */
+async function openExternal() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) return;
+  const preview = previewFor(editor.document.uri);
+  if (!preview) return;
+  preview.external = true;
+  if (!fs.existsSync(preview.pdfPath)) await preview.compile();
+  if (!fs.existsSync(preview.pdfPath)) return;
+  const cmd = vscode.workspace.getConfiguration('texPreview').get('externalViewer.command');
+  if (cmd) runShell(fill(cmd, preview, { PDF: preview.pdfPath }), preview.rootDir);
+  else vscode.env.openExternal(vscode.Uri.file(preview.pdfPath));
+}
+
+/** Opens the live preview in the default web browser; it stays in sync with VS Code. */
+async function openInBrowser(preview, launch = true) {
+  preview.external = true;
+  const url = await browserServer.url(preview);
+  if (launch) vscode.env.openExternal(url);
+  if (!fs.existsSync(preview.pdfPath)) preview.compile();
+  return url.toString(); // the address, for scripts and tests
+}
+
+/** The TeX status bar item's menu: everything you can do with the build and the PDF. */
+async function showMenu() {
+  const p = activePreview();
+  const items = [
+    { label: '$(refresh) Recompile', command: 'texPreview.compile' },
+    { label: '$(debug-stop) Stop Compiling', command: 'texPreview.stop', hide: !p || (!p.proc && !p.running) },
+    { label: '$(open-preview) Open Preview to the Side', command: 'texPreview.open' },
+    { label: '$(globe) Open Preview in Browser', description: 'live reload and SyncTeX', command: 'texPreview.openInBrowser' },
+    { label: '$(file-pdf) Open PDF in External Viewer', command: 'texPreview.openExternal' },
+    { label: '$(go-to-file) Jump to Location in PDF', command: 'texPreview.syncToPdf' },
+    { label: '', kind: vscode.QuickPickItemKind.Separator },
+    { label: '$(book) Word Count', command: 'texPreview.wordCount' },
+    { label: '$(symbol-operator) Show Symbol Palette', command: 'texPreview.showSymbols' },
+    { label: '$(search) Insert Symbol…', command: 'texPreview.insertSymbol' },
+    { label: '$(trash) Clean Auxiliary Files', command: 'texPreview.clean' },
+    { label: '$(output) Show Compile Log', command: 'texPreview.showLog' },
+  ].filter((i) => !i.hide);
+  const picked = await vscode.window.showQuickPick(items, { title: 'TeX' });
+  if (picked && picked.command) vscode.commands.executeCommand(picked.command);
+}
+
+/** Deletes auxiliary files (not the PDF) for the active document's project. */
+async function clean() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.uri.scheme !== 'file') return;
+  const root = resolveRoot(editor.document.uri.fsPath);
+  const rel = vscode.workspace.getConfiguration('texPreview').get('outDir') || '.';
+  const outDir = path.resolve(path.dirname(root), rel);
+  const removed = [];
+  const walk = (dir, depth) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (depth > 0 && !e.name.startsWith('.') && e.name !== 'node_modules') walk(full, depth - 1);
+      } else if (AUX_EXT.test(e.name)) {
+        fs.rmSync(full, { force: true });
+        removed.push(full);
+      }
+    }
+  };
+  // A dedicated build folder is cleaned throughout; building next to the source, only top-level files.
+  walk(outDir, outDir === path.dirname(root) ? 0 : 3);
+  vscode.window.setStatusBarMessage(`TeX: removed ${removed.length} auxiliary file${removed.length === 1 ? '' : 's'}`, 4000);
+}
+
+/** Replaces %DOC%, %DOCFILE%, %TEX%, %DIR%, %OUTDIR% (and any extra keys) in a user command. */
+function fill(cmd, p, extra = {}) {
+  const vars = { DOC: path.join(p.rootDir, p.base), DOCFILE: p.base, TEX: p.root, DIR: p.rootDir, OUTDIR: p.outDir, ...extra };
+  return cmd.replace(/%([A-Z]+)%/g, (m, k) => (k in vars ? vars[k] : m));
+}
+
+function runShell(cmd, cwd) {
+  const proc = spawn(cmd, { cwd, shell: true, env: { ...process.env, PATH: searchPath() }, detached: true, stdio: 'ignore' });
+  proc.on('error', (e) => vscode.window.showErrorMessage(`TeX Preview: ${e.message}`));
+  proc.unref();
 }
 
 function compileActive() {
@@ -112,7 +247,12 @@ function syncToPdf() {
   const file = editor.document.uri.fsPath;
   const root = resolveRoot(file);
   const p = previews.get(root) || [...previews.values()].find((v) => !path.relative(v.rootDir, file).startsWith('..'));
-  if (!p) {
+  const syncCmd = vscode.workspace.getConfiguration('texPreview').get('externalViewer.syncCommand');
+  if (p && !p.panel && !p.clients.size && syncCmd) {
+    runShell(fill(syncCmd, p, { PDF: p.pdfPath, LINE: String(editor.selection.active.line + 1), TEX: file }), p.rootDir);
+    return;
+  }
+  if (!p || (!p.panel && !p.clients.size)) {
     openPreview(editor.document.uri);
     return;
   }
@@ -121,7 +261,7 @@ function syncToPdf() {
     vscode.window.setStatusBarMessage('TeX Preview: no PDF location for this line (compile first?)', 3000);
     return;
   }
-  p.panel.reveal(undefined, true);
+  if (p.panel) p.panel.reveal(undefined, true);
   p.post({ type: 'scrollTo', ...loc });
 }
 
@@ -143,55 +283,10 @@ function onSave(doc) {
 // ---------------------------------------------------------------------------
 // Tool discovery
 
-function searchPath() {
-  const cfg = vscode.workspace.getConfiguration('texPreview');
-  const extra = cfg.get('extraPath') || [];
-  const home = os.homedir();
-  const defaults =
-    process.platform === 'win32'
-      ? []
-      : [
-          '/Library/TeX/texbin',
-          '/opt/homebrew/bin',
-          '/usr/local/bin',
-          '/usr/texbin',
-          '/usr/bin',
-          path.join(home, '.cargo', 'bin'),
-          path.join(home, 'bin'),
-        ];
-  // Also pick up any TeX Live install under /usr/local/texlive/<year>/bin/<arch>.
-  try {
-    const tl = '/usr/local/texlive';
-    for (const year of fs.readdirSync(tl).sort().reverse()) {
-      const binRoot = path.join(tl, year, 'bin');
-      if (!fs.existsSync(binRoot)) continue;
-      for (const arch of fs.readdirSync(binRoot)) defaults.push(path.join(binRoot, arch));
-    }
-  } catch {
-    /* no TeX Live there */
-  }
-  const parts = [...extra, ...(process.env.PATH || '').split(path.delimiter), ...defaults];
-  return [...new Set(parts.filter(Boolean))].join(path.delimiter);
-}
-
-function which(cmd, PATH) {
-  const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
-  for (const dir of PATH.split(path.delimiter)) {
-    for (const ext of exts) {
-      const full = path.join(dir, cmd + ext);
-      try {
-        fs.accessSync(full, fs.constants.X_OK);
-        if (fs.statSync(full).isFile()) return full;
-      } catch {
-        /* keep looking */
-      }
-    }
-  }
-  return null;
-}
-
-function pickEngine(PATH) {
+function pickEngine(PATH, docker) {
   const wanted = vscode.workspace.getConfiguration('texPreview').get('engine') || 'auto';
+  // Inside a container we can't look for binaries; trust the image to have the one asked for.
+  if (docker) return { name: wanted === 'auto' ? 'latexmk' : wanted, bin: wanted === 'auto' ? 'latexmk' : wanted };
   const order = wanted === 'auto' ? ['latexmk', 'tectonic', 'pdflatex'] : [wanted];
   for (const name of order) {
     const bin = which(name, PATH);
@@ -205,7 +300,7 @@ function pickEngine(PATH) {
 
 function run(bin, args, opts, log) {
   return new Promise((resolve) => {
-    log(`$ ${path.basename(bin)} ${args.join(' ')}\n`);
+    log(`$ ${opts.shell ? bin : path.basename(bin)} ${args.join(' ')}\n`);
     const proc = spawn(bin, args, { ...opts, detached: process.platform !== 'win32' });
     opts.onSpawn && opts.onSpawn(proc);
     let text = '';
@@ -329,10 +424,29 @@ class Preview {
     this.proc = null;
     this.generation = 0;
     this.running = null;
+    this.panel = null;
+    this.external = false; // also shown outside VS Code (browser or external viewer), so it outlives its panel
+    this.clients = new Map(); // browser tabs: id -> { res, queue }
+  }
 
+  addClient(id, res) {
+    const queued = this.clients.get(id)?.queue || [];
+    this.clients.set(id, { res, queue: null });
+    queued.forEach((m) => res.write(`data: ${JSON.stringify(m)}\n\n`));
+  }
+
+  removeClient(id) {
+    this.clients.delete(id);
+  }
+
+  showPanel() {
+    if (this.panel) {
+      this.panel.reveal(vscode.ViewColumn.Beside, true);
+      return;
+    }
     this.panel = vscode.window.createWebviewPanel(
       'texPreview',
-      `Preview ${path.basename(root)}`,
+      `Preview ${path.basename(this.root)}`,
       { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
@@ -347,10 +461,30 @@ class Preview {
       light: vscode.Uri.joinPath(extensionUri, 'media', 'preview-light.svg'),
       dark: vscode.Uri.joinPath(extensionUri, 'media', 'preview-dark.svg'),
     };
-    this.panel.webview.html = this.html();
     this.ready = new Promise((resolve) => (this.resolveReady = resolve));
     this.panel.webview.onDidReceiveMessage((msg) => this.onMessage(msg));
-    this.panel.onDidDispose(() => this.dispose());
+    this.panel.webview.html = this.html();
+    this.panel.onDidDispose(() => {
+      this.panel = null;
+      if (!this.external && !this.clients.size) this.dispose();
+    });
+  }
+
+  /** Whether the viewer should show the PDF inverted (texPreview.invertPdf). */
+  sendConfig(initial = false, client) {
+    const mode = vscode.workspace.getConfiguration('texPreview').get('invertPdf') || 'never';
+    const kind = vscode.window.activeColorTheme.kind;
+    const darkTheme = kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast;
+    this.post({ type: 'config', invert: mode === 'always' || (mode === 'darkTheme' && darkTheme), initial }, client);
+  }
+
+  stop() {
+    if (!this.proc && !this.running) return;
+    this.generation++;
+    killTree(this.proc);
+    this.proc = null;
+    this.post({ type: 'status', state: 'idle', message: 'Compile stopped', errors: [] });
+    setStatus('$(debug-stop) TeX: stopped', 'Compile stopped — save or Recompile to build again');
   }
 
   get outDir() {
@@ -364,20 +498,58 @@ class Preview {
 
   dispose() {
     killTree(this.proc);
+    if (this.panel) this.panel.dispose();
+    browserServer?.forget(this);
+    for (const c of this.clients.values()) c.res?.end();
     previews.delete(this.root);
     diagnostics.clear();
     statusItem.hide();
   }
 
-  post(msg) {
-    this.ready.then(() => this.panel.webview.postMessage(msg));
+  /** To the panel and every browser tab, or to one browser tab (`client`). */
+  post(msg, client) {
+    if (msg.type === 'status' && !client) this.lastStatus = msg;
+    const toClient = (id) => {
+      let c = this.clients.get(id);
+      if (!c) this.clients.set(id, (c = { res: null, queue: [] }));
+      if (c.res) c.res.write(`data: ${JSON.stringify(msg)}\n\n`);
+      else c.queue.push(msg); // its event stream hasn't connected yet
+    };
+    if (client) return toClient(client);
+    if (this.panel) {
+      const panel = this.panel;
+      this.ready.then(() => panel.webview.postMessage(msg));
+    }
+    for (const [id, c] of this.clients) if (c.res) toClient(id);
   }
 
-  onMessage(msg) {
+  /** Headings of the whole project for the preview's Sections menu. */
+  sendSections(client) {
+    try {
+      const items = structure.projectSections(this.root).map((s) => ({ title: [s.number, s.title].filter(Boolean).join('  '), level: s.level, file: s.file, line: s.line + 1 }));
+      this.post({ type: 'sections', items }, client);
+    } catch (e) {
+      output.appendLine(`[tex-preview] sections: ${e.message}`);
+    }
+  }
+
+  onMessage(msg, client) {
     switch (msg.type) {
       case 'ready':
-        this.resolveReady();
-        if (fs.existsSync(this.pdfPath)) this.sendPdf();
+        if (!client && this.resolveReady) this.resolveReady();
+        this.sendConfig(true, client);
+        this.sendSections(client);
+        if (client && this.lastStatus) this.post(this.lastStatus, client);
+        if (fs.existsSync(this.pdfPath)) this.sendPdf(client);
+        break;
+      case 'goto': {
+        const loc = this.synctex()?.toPdf(msg.file, msg.line);
+        if (loc) this.post({ type: 'scrollTo', ...loc }, client);
+        else revealLine(msg.file, msg.line);
+        break;
+      }
+      case 'openBrowser':
+        openInBrowser(this);
         break;
       case 'reveal':
         revealLine(msg.file || this.root, msg.line);
@@ -423,10 +595,11 @@ class Preview {
     return null;
   }
 
-  sendPdf() {
+  sendPdf(client) {
+    if (!this.panel && !this.clients.size) return;
     fs.readFile(this.pdfPath, (err, buf) => {
       if (err) return;
-      this.post({ type: 'pdf', data: buf.toString('base64') });
+      this.post({ type: 'pdf', data: buf.toString('base64') }, client);
     });
   }
 
@@ -445,8 +618,11 @@ class Preview {
   }
 
   async doCompile(gen) {
+    const cfg = vscode.workspace.getConfiguration('texPreview');
     const PATH = searchPath();
-    const engine = pickEngine(PATH);
+    const docker = (cfg.get('docker.image') || '').trim();
+    const custom = (cfg.get('buildCommand') || '').trim();
+    const engine = custom ? { name: 'build command', bin: custom } : pickEngine(PATH, docker);
     const name = path.basename(this.root);
 
     if (!engine.bin) {
@@ -474,23 +650,55 @@ class Preview {
       onSpawn: (p) => (this.proc = p),
     };
     const outRel = path.relative(this.rootDir, this.outDir) || '.';
-    const file = path.basename(this.root);
+    let file = path.basename(this.root);
+
+    // TeX programs run directly, or inside texPreview.docker.image with the project mounted at
+    // the same path.
+    this.tool = (bin, args, o) => {
+      if (!docker) return run(bin, args, o, log);
+      const ws = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.root));
+      const mount = ws ? ws.uri.fsPath : this.rootDir;
+      const envArgs = Object.entries(o.env)
+        .filter(([k, v]) => k !== 'PATH' && process.env[k] !== v)
+        .flatMap(([k, v]) => ['-e', `${k}=${v}`]);
+      const user = process.platform === 'linux' && process.getuid ? ['--user', `${process.getuid()}:${process.getgid()}`] : [];
+      const dockerArgs = ['run', '--rm', '-i', '-v', `${mount}:${mount}`, '-w', o.cwd, ...user, ...envArgs, docker, bin, ...args];
+      return run(which('docker', PATH) || 'docker', dockerArgs, o, log);
+    };
+
+    // Literate sources are woven to .tex first (knitr for .rnw, Weave.jl for .jnw).
+    const ext = path.extname(this.root).toLowerCase();
+    if (!custom && (ext === '.rnw' || ext === '.jnw')) {
+      const r =
+        ext === '.rnw'
+          ? await run(which('Rscript', PATH) || 'Rscript', ['-e', `knitr::knit('${file.replace(/'/g, "\\'")}')`], opts, log)
+          : await run(which('julia', PATH) || 'julia', ['-e', `using Weave; weave(${JSON.stringify(file)}, doctype="tex")`], opts, log);
+      if (gen !== this.generation || r.killed) return;
+      if (r.code !== 0) {
+        const message = `Weaving ${file} failed (${ext === '.rnw' ? 'Rscript/knitr' : 'julia/Weave'}) — see the log.`;
+        this.post({ type: 'status', state: 'error', message, errors: [{ file: this.root, rel: file, line: 0, message }] });
+        setStatus('$(error) TeX: errors', message);
+        return;
+      }
+      file = this.base + '.tex';
+    }
 
     let result;
     const latexFlags = ['-interaction=nonstopmode', '-file-line-error', '-synctex=1', '-halt-on-error'];
 
-    if (engine.name === 'latexmk') {
-      const mode = vscode.workspace.getConfiguration('texPreview').get('latexmkEngine') || 'pdf';
-      result = await run(
+    if (custom) {
+      result = await run(fill(custom, this), [], { ...opts, shell: true }, log);
+    } else if (engine.name === 'latexmk') {
+      const mode = cfg.get('latexmkEngine') || 'pdf';
+      result = await this.tool(
         engine.bin,
         [`-${mode}`, ...latexFlags.filter((f) => f !== '-halt-on-error'), '-f', `-outdir=${outRel}`, file],
-        opts,
-        log
+        opts
       );
     } else if (engine.name === 'tectonic') {
-      result = await run(engine.bin, ['--keep-logs', '--synctex', '--outdir', outRel, file], opts, log);
+      result = await this.tool(engine.bin, ['--keep-logs', '--synctex', '--outdir', outRel, file], opts);
     } else {
-      result = await this.runPlainLatex(engine.bin, PATH, file, outRel, opts, log, gen);
+      result = await this.runPlainLatex(engine.bin, PATH, file, outRel, opts, gen, !!docker);
     }
 
     if (gen !== this.generation || result.killed) return; // superseded
@@ -511,6 +719,7 @@ class Preview {
     const secs = ((Date.now() - started) / 1000).toFixed(1);
     const failed = errors.length > 0 || result.code !== 0;
     if (pdfFresh) this.sendPdf();
+    this.sendSections();
 
     const shownErrors = errors.slice(0, 50).map((e) => ({
       file: e.file,
@@ -537,21 +746,21 @@ class Preview {
   }
 
   /** pdflatex/xelatex/lualatex: one pass, bibtex if needed, then reruns until refs settle. */
-  async runPlainLatex(bin, PATH, file, outRel, opts, log, gen) {
+  async runPlainLatex(bin, PATH, file, outRel, opts, gen, inDocker) {
     const args = [...['-interaction=nonstopmode', '-file-line-error', '-synctex=1'], `-output-directory=${outRel}`, file];
     const auxPath = path.join(this.outDir, this.base + '.aux');
     const logPath = path.join(this.outDir, this.base + '.log');
 
-    let result = await run(bin, args, opts, log);
+    let result = await this.tool(bin, args, opts);
     if (result.killed || gen !== this.generation) return result;
 
     let needRerun = false;
     const aux = readIfExists(auxPath);
     if (/\\bibdata\{/.test(aux)) {
-      const bibtex = which('bibtex', PATH);
+      const bibtex = inDocker ? 'bibtex' : which('bibtex', PATH);
       if (bibtex) {
         const env = { ...opts.env, BIBINPUTS: this.rootDir + path.delimiter, BSTINPUTS: this.rootDir + path.delimiter };
-        const r = await run(bibtex, [this.base], { ...opts, cwd: this.outDir, env }, log);
+        const r = await this.tool(bibtex, [this.base], { ...opts, cwd: this.outDir, env });
         if (r.killed) return r;
         needRerun = true;
       }
@@ -561,54 +770,70 @@ class Preview {
       if (!needRerun && !/Rerun to get|Label\(s\) may have changed|undefined references/.test(logText)) break;
       if (pass > 0 && !/Rerun to get|Label\(s\) may have changed/.test(logText)) break;
       needRerun = false;
-      result = await run(bin, args, opts, log);
+      result = await this.tool(bin, args, opts);
       if (result.killed || gen !== this.generation) return result;
     }
     return result;
   }
 
-  html() {
+  /** Webview asset URLs, CSP and nonce for the panel. */
+  webviewAssets() {
     const webview = this.panel.webview;
-    const media = (f) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', f));
-    const pdfjs = (f) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'node_modules', 'pdfjs-dist', 'build', f));
     const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
-    const csp = [
-      `default-src 'none'`,
-      `img-src ${webview.cspSource} data: blob:`,
-      `style-src ${webview.cspSource} 'unsafe-inline'`,
-      `font-src ${webview.cspSource} data:`,
-      `script-src 'nonce-${nonce}' ${webview.cspSource}`,
-      `connect-src ${webview.cspSource} data: blob:`,
-      `worker-src blob:`,
-    ].join('; ');
+    return {
+      nonce,
+      media: (f) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', f)),
+      pdfjs: (f) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'node_modules', 'pdfjs-dist', 'build', f)),
+      assets: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'node_modules', 'pdfjs-dist')).toString(),
+      csp: [
+        `default-src 'none'`,
+        `img-src ${webview.cspSource} data: blob:`,
+        `style-src ${webview.cspSource} 'unsafe-inline'`,
+        `font-src ${webview.cspSource} data:`,
+        `script-src 'nonce-${nonce}' ${webview.cspSource}`,
+        `connect-src ${webview.cspSource} data: blob:`,
+        `worker-src blob:`,
+      ].join('; '),
+    };
+  }
 
+  /** The viewer page, for the panel (webview assets) or a browser (see server.js). */
+  html(a = this.webviewAssets()) {
+    const nonce = a.nonce || '';
+    const n = nonce ? ` nonce="${nonce}"` : '';
+    const assets = a.browser ? `new URL(${JSON.stringify(a.assets)}, location.href).href` : JSON.stringify(a.assets);
+    const worker = a.browser ? `new URL(${JSON.stringify(a.pdfjs('pdf.worker.min.js'))}, location.href).href` : JSON.stringify(a.pdfjs('pdf.worker.min.js').toString());
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="${csp}">
+${a.csp ? `<meta http-equiv="Content-Security-Policy" content="${a.csp}">` : ''}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="${media('viewer.css')}">
-<title>Preview</title>
+<link rel="stylesheet" href="${a.media('viewer.css')}">
+<title>${a.browser ? `${this.base}.pdf — TeX Preview` : 'Preview'}</title>
 </head>
-<body>
+<body class="${a.browser ? 'browser' : ''}">
   <header id="toolbar">
     <button id="recompile" title="Recompile (⌘/Ctrl+Enter in the editor)">
       <span class="codicon">⟳</span> Recompile
     </button>
     <span id="status" class="status idle"><span class="dot"></span><span id="status-text">Waiting…</span></span>
     <span class="spacer"></span>
+    <span class="menu-wrap"><button id="sections-btn" title="Sections — jump to a heading" hidden>☰ Sections</button><div id="sections" class="menu" hidden></div></span>
     <span id="pages"></span>
     <button id="zoom-out" title="Zoom out">−</button>
     <button id="zoom-label" title="Fit to width">Fit</button>
     <button id="zoom-in" title="Zoom in">+</button>
+    <button id="invert" title="Dark PDF (texPreview.invertPdf)">◐</button>
+    <button id="open-browser" title="Open in browser (live, with SyncTeX)">↗</button>
   </header>
   <section id="errors" hidden></section>
   <main id="viewer"><div id="empty">The PDF will appear here after the first compile.</div></main>
-  <script nonce="${nonce}" src="${pdfjs('pdf.min.js')}"></script>
-  <script nonce="${nonce}">window.PDF_WORKER_URL = ${JSON.stringify(pdfjs('pdf.worker.min.js').toString())};
-    window.PDF_ASSETS = ${JSON.stringify(webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'node_modules', 'pdfjs-dist')).toString())};</script>
-  <script nonce="${nonce}" src="${media('viewer.js')}"></script>
+  ${a.shim ? `<script>${a.shim}</script>` : ''}
+  <script${n} src="${a.pdfjs('pdf.min.js')}"></script>
+  <script${n}>window.PDF_WORKER_URL = ${worker};
+    window.PDF_ASSETS = ${assets};</script>
+  <script${n} src="${a.media('viewer.js')}"></script>
 </body>
 </html>`;
   }

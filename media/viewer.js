@@ -386,6 +386,51 @@
     setZoom([...ZOOMS].reverse().find((z) => z < cur - 0.01) || ZOOMS[0]);
   });
   zoomLabel.addEventListener('click', () => setZoom('fit'));
+
+  // Sections menu: the project's headings; choosing one scrolls the PDF there (via SyncTeX).
+  const sectionsBtn = document.getElementById('sections-btn');
+  const sectionsMenu = document.getElementById('sections');
+  function setSections(items) {
+    sectionsMenu.replaceChildren();
+    sectionsBtn.hidden = !items.length;
+    const minLevel = Math.min(...items.map((s) => s.level));
+    for (const s of items) {
+      const b = document.createElement('button');
+      b.className = 'menu-item';
+      b.style.paddingLeft = 10 + (s.level - minLevel) * 14 + 'px';
+      if (s.level <= minLevel) b.classList.add('top');
+      b.textContent = s.title;
+      b.title = s.title;
+      b.addEventListener('click', () => {
+        sectionsMenu.hidden = true;
+        vscode.postMessage({ type: 'goto', file: s.file, line: s.line });
+      });
+      sectionsMenu.appendChild(b);
+    }
+  }
+  sectionsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sectionsMenu.hidden = !sectionsMenu.hidden;
+  });
+  document.addEventListener('click', (e) => {
+    if (!sectionsMenu.hidden && !sectionsMenu.contains(e.target)) sectionsMenu.hidden = true;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') sectionsMenu.hidden = true;
+  });
+  document.getElementById('open-browser').addEventListener('click', () => vscode.postMessage({ type: 'openBrowser' }));
+
+  // Dark PDF: the setting decides, the toolbar button overrides it for this preview.
+  function setInvert(on) {
+    document.body.classList.toggle('invert', on);
+    document.getElementById('invert').classList.toggle('on', on);
+  }
+  document.getElementById('invert').addEventListener('click', () => {
+    state.invert = !document.body.classList.contains('invert');
+    saveState();
+    setInvert(state.invert);
+  });
+  if (typeof state.invert === 'boolean') setInvert(state.invert);
   document.getElementById('recompile').addEventListener('click', () => vscode.postMessage({ type: 'recompile' }));
 
   // Ctrl/Cmd + wheel to zoom, like a PDF viewer.
@@ -435,6 +480,15 @@
       showLocation(msg);
     } else if (msg.type === 'status') {
       setStatus(msg);
+    } else if (msg.type === 'sections') {
+      setSections(msg.items || []);
+    } else if (msg.type === 'config') {
+      // On first load a remembered toggle wins; a changed setting or theme resets it.
+      if (!(msg.initial && typeof state.invert === 'boolean')) {
+        delete state.invert;
+        saveState();
+        setInvert(msg.invert);
+      }
     }
   });
 

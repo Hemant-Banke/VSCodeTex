@@ -1,8 +1,8 @@
 {
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview",
-  "description": "Overleaf-style side-by-side LaTeX preview with SyncTeX, plus two-way Overleaf sync over Git.",
-  "version": "1.0.0",
+  "description": "Overleaf-style side-by-side LaTeX preview with SyncTeX, plus completions, hover previews, outline and two-way Overleaf sync — native to VS Code.",
+  "version": "1.1.0",
   "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {
@@ -17,8 +17,11 @@
     "vscode": "^1.80.0"
   },
   "categories": [
+    "Programming Languages",
     "Visualization",
-    "Other"
+    "Formatters",
+    "Linters",
+    "Snippets"
   ],
   "keywords": [
     "latex",
@@ -38,12 +41,17 @@
     "paper",
     "thesis",
     "overleaf sync",
-    "git"
+    "git",
+    "intellisense",
+    "bibtex formatter",
+    "chktex",
+    "mathjax"
   ],
   "main": "./extension.js",
   "activationEvents": [
     "onLanguage:latex",
     "onLanguage:tex",
+    "onLanguage:bibtex",
     "workspaceContains:**/*.tex",
     "onStartupFinished"
   ],
@@ -96,6 +104,135 @@
         "command": "texPreview.overleaf.setToken",
         "title": "Set Git Token…",
         "category": "Overleaf"
+      },
+      {
+        "command": "texPreview.stop",
+        "title": "Stop Compiling",
+        "category": "TeX",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "texPreview.clean",
+        "title": "Clean Auxiliary Files",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.openExternal",
+        "title": "Open PDF in External Viewer",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.wordCount",
+        "title": "Count Words",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.wrap",
+        "title": "Surround with Command…",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.wrapEnvironment",
+        "title": "Surround with Environment…",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.closeEnvironment",
+        "title": "Close Current Environment",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.toggleDisplayMath",
+        "title": "Toggle \\[ \\] and equation*",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.gotoMatchingEnvironment",
+        "title": "Go to Matching \\begin / \\end",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.endList",
+        "title": "End List",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.bold",
+        "title": "Bold",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.italic",
+        "title": "Italic",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.emph",
+        "title": "Emphasis",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.typewriter",
+        "title": "Typewriter",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.underline",
+        "title": "Underline",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.smallCaps",
+        "title": "Small Caps",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.footnote",
+        "title": "Footnote",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.wrapMath",
+        "title": "Inline Math $…$",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.promoteSection",
+        "title": "Promote Heading",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.demoteSection",
+        "title": "Demote Heading",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.toggleStar",
+        "title": "Toggle Star (numbered / unnumbered)",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.insertSymbol",
+        "title": "Insert Symbol…",
+        "category": "TeX",
+        "icon": "$(symbol-operator)"
+      },
+      {
+        "command": "texPreview.showSymbols",
+        "title": "Show Symbol Palette",
+        "category": "TeX",
+        "icon": "$(symbol-operator)"
+      },
+      {
+        "command": "texPreview.openInBrowser",
+        "title": "Open Preview in Browser",
+        "category": "TeX",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "texPreview.menu",
+        "title": "TeX Actions…",
+        "category": "TeX"
       }
     ],
     "menus": {
@@ -104,6 +241,16 @@
           "command": "texPreview.open",
           "when": "resourceExtname == .tex || editorLangId == latex",
           "group": "navigation"
+        },
+        {
+          "command": "texPreview.openInBrowser",
+          "when": "resourceExtname == .tex || editorLangId == latex",
+          "group": "1_tex@1"
+        },
+        {
+          "command": "texPreview.showSymbols",
+          "when": "editorLangId =~ /^(la)?tex$/",
+          "group": "navigation@1"
         }
       ],
       "editor/title/context": [
@@ -130,6 +277,11 @@
           "command": "texPreview.syncToPdf",
           "when": "resourceExtname == .tex || editorLangId == latex",
           "group": "navigation@91"
+        },
+        {
+          "submenu": "texPreview.latex",
+          "when": "editorLangId =~ /^(la)?tex$/",
+          "group": "navigation@92"
         }
       ],
       "commandPalette": [
@@ -140,6 +292,180 @@
         {
           "command": "texPreview.syncToPdf",
           "when": "resourceExtname == .tex || editorLangId == latex"
+        },
+        {
+          "command": "texPreview.wordCount",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.wrap",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.wrapEnvironment",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.closeEnvironment",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.toggleDisplayMath",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.gotoMatchingEnvironment",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.endList",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.bold",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.italic",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.emph",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.typewriter",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.underline",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.smallCaps",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.footnote",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.wrapMath",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.promoteSection",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.demoteSection",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.toggleStar",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        }
+      ],
+      "texPreview.latex": [
+        {
+          "submenu": "texPreview.format",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "texPreview.wrap",
+          "group": "1_edit@2"
+        },
+        {
+          "command": "texPreview.wrapEnvironment",
+          "group": "1_edit@3"
+        },
+        {
+          "submenu": "texPreview.structure",
+          "group": "1_edit@4"
+        },
+        {
+          "command": "texPreview.insertSymbol",
+          "group": "2_insert@1"
+        },
+        {
+          "command": "texPreview.showSymbols",
+          "group": "2_insert@2"
+        },
+        {
+          "command": "texPreview.wordCount",
+          "group": "3_doc@1"
+        },
+        {
+          "command": "texPreview.openInBrowser",
+          "group": "3_doc@2"
+        },
+        {
+          "command": "texPreview.openExternal",
+          "group": "3_doc@3"
+        },
+        {
+          "command": "texPreview.clean",
+          "group": "3_doc@4"
+        }
+      ],
+      "texPreview.format": [
+        {
+          "command": "texPreview.bold",
+          "group": "1@0"
+        },
+        {
+          "command": "texPreview.italic",
+          "group": "1@1"
+        },
+        {
+          "command": "texPreview.emph",
+          "group": "1@2"
+        },
+        {
+          "command": "texPreview.typewriter",
+          "group": "1@3"
+        },
+        {
+          "command": "texPreview.underline",
+          "group": "1@4"
+        },
+        {
+          "command": "texPreview.smallCaps",
+          "group": "1@5"
+        },
+        {
+          "command": "texPreview.footnote",
+          "group": "1@6"
+        },
+        {
+          "command": "texPreview.wrapMath",
+          "group": "1@7"
+        }
+      ],
+      "texPreview.structure": [
+        {
+          "command": "texPreview.promoteSection",
+          "group": "1@0"
+        },
+        {
+          "command": "texPreview.demoteSection",
+          "group": "1@1"
+        },
+        {
+          "command": "texPreview.toggleStar",
+          "group": "1@2"
+        },
+        {
+          "command": "texPreview.closeEnvironment",
+          "group": "2@3"
+        },
+        {
+          "command": "texPreview.toggleDisplayMath",
+          "group": "2@4"
+        },
+        {
+          "command": "texPreview.gotoMatchingEnvironment",
+          "group": "2@5"
         }
       ]
     },
@@ -161,6 +487,125 @@
         "key": "ctrl+alt+j",
         "mac": "cmd+alt+j",
         "when": "editorTextFocus && (resourceExtname == .tex || editorLangId == latex)"
+      },
+      {
+        "command": "texPreview.bold",
+        "key": "alt+l b",
+        "mac": "ctrl+l b",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.italic",
+        "key": "alt+l i",
+        "mac": "ctrl+l i",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.emph",
+        "key": "alt+l e",
+        "mac": "ctrl+l e",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.typewriter",
+        "key": "alt+l t",
+        "mac": "ctrl+l t",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.underline",
+        "key": "alt+l u",
+        "mac": "ctrl+l u",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.smallCaps",
+        "key": "alt+l s",
+        "mac": "ctrl+l s",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.footnote",
+        "key": "alt+l f",
+        "mac": "ctrl+l f",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.wrapMath",
+        "key": "alt+l 4",
+        "mac": "ctrl+l 4",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.wrap",
+        "key": "alt+l w",
+        "mac": "ctrl+l w",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.wrapEnvironment",
+        "key": "alt+l n",
+        "mac": "ctrl+l n",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.closeEnvironment",
+        "key": "alt+l c",
+        "mac": "ctrl+l c",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.toggleDisplayMath",
+        "key": "alt+l m",
+        "mac": "ctrl+l m",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.gotoMatchingEnvironment",
+        "key": "alt+l j",
+        "mac": "ctrl+l j",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.toggleStar",
+        "key": "alt+l 8",
+        "mac": "ctrl+l 8",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.promoteSection",
+        "key": "alt+l up",
+        "mac": "ctrl+l up",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.demoteSection",
+        "key": "alt+l down",
+        "mac": "ctrl+l down",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.insertSymbol",
+        "key": "alt+l .",
+        "mac": "ctrl+l .",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.showSymbols",
+        "key": "alt+l p",
+        "mac": "ctrl+l p",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.wordCount",
+        "key": "alt+l alt+c",
+        "mac": "ctrl+l ctrl+c",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.endList",
+        "key": "enter",
+        "when": "editorTextFocus && editorLangId == latex && texPreview.emptyItem && !suggestWidgetVisible && !inSnippetMode"
       }
     ],
     "configuration": {
@@ -223,8 +668,81 @@
           "default": 2,
           "minimum": 0,
           "description": "Seconds to wait after a save before pushing, so quick successive saves go up as one commit."
+        },
+        "texPreview.buildCommand": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Shell command that replaces the built-in build, e.g. `latexmk -pdf -outdir=%OUTDIR% %DOC%`. Placeholders: `%DOC%` (main file without extension), `%DOCFILE%` (its name), `%TEX%`, `%DIR%`, `%OUTDIR%`. The PDF is expected at `%OUTDIR%/%DOCFILE%.pdf`."
+        },
+        "texPreview.docker.image": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Run the compiler inside this Docker image (e.g. `texlive/texlive`) instead of a local TeX install. The workspace folder is mounted at the same path."
+        },
+        "texPreview.invertPdf": {
+          "type": "string",
+          "enum": [
+            "never",
+            "darkTheme",
+            "always"
+          ],
+          "default": "never",
+          "enumDescriptions": [
+            "Show the PDF as printed.",
+            "Dark PDF when VS Code uses a dark theme.",
+            "Always show a dark PDF."
+          ],
+          "markdownDescription": "Show the PDF with dark pages. The ◐ button in the preview toggles it for that preview."
+        },
+        "texPreview.chktex": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Lint `.tex` files with [ChkTeX](https://www.nongnu.org/chktex/) as you type (needs `chktex`, included in TeX Live)."
+        },
+        "texPreview.externalViewer.command": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Command for **TeX: Open PDF in External Viewer**, e.g. `open -a Skim %PDF%`. Empty opens the system's default PDF app."
+        },
+        "texPreview.externalViewer.syncCommand": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Forward search in the external viewer, used by **Jump to Location in PDF** when the PDF is open externally. Placeholders `%PDF%`, `%TEX%`, `%LINE%`, e.g. `/Applications/Skim.app/Contents/SharedSupport/displayline -r %LINE% %PDF% %TEX%`."
         }
       }
+    },
+    "submenus": [
+      {
+        "id": "texPreview.latex",
+        "label": "LaTeX"
+      },
+      {
+        "id": "texPreview.format",
+        "label": "Format"
+      },
+      {
+        "id": "texPreview.structure",
+        "label": "Structure"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "texSymbols",
+          "title": "LaTeX Symbols",
+          "icon": "media/symbols.svg"
+        }
+      ]
+    },
+    "views": {
+      "texSymbols": [
+        {
+          "type": "webview",
+          "id": "texPreview.symbols",
+          "name": "Symbols",
+          "when": "texPreview.texActive"
+        }
+      ]
     }
   },
   "scripts": {
@@ -233,6 +751,7 @@
     "publish:ovsx": "npm run package && ovsx publish *.vsix"
   },
   "dependencies": {
+    "mathjax": "3.2.2",
     "pdfjs-dist": "3.11.174"
   },
   "icon": "media/logo.png",
@@ -244,5 +763,8 @@
     "color": "#1d2430",
     "theme": "dark"
   },
-  "pricing": "Free"
+  "pricing": "Free",
+  "extensionKind": [
+    "workspace"
+  ]
 }

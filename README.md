@@ -2,11 +2,14 @@
 
 **Overleaf-style LaTeX editing inside VS Code.** Your source is on the left and the PDF on the right. Save the file and the PDF re-renders in place. Double-click the PDF to jump to the source, links work, text can be copied, and the project can sync both ways with Overleaf.
 
-![The editor on the left, the compiled PDF on the right](docs/images/overview.png)
+It feels like part of VS Code rather than something bolted on. The LaTeX help works through VS Code's own features: suggestions, hovers, Outline, folding, Format Document, the Problems panel, Expand Selection and the status bar. The only addition is a **Symbols** palette in the bottom panel, which appears only while a LaTeX file is open.
+
+![The editor with the numbered Outline, the PDF preview with its Sections menu, and the word count in the status bar](docs/images/feature-overview.png)
 
 **Contents**
 
 - [Features at a glance](#features-at-a-glance)
+- [Complete feature list](#complete-feature-list)
 - [Installation](#installation)
 - [Opening the preview](#opening-the-preview)
 - [Features](#features)
@@ -18,6 +21,10 @@
   - [Selecting and copying text](#selecting-and-copying-text)
   - [Zoom](#zoom)
   - [Multi-file projects](#multi-file-projects)
+- [Writing LaTeX](#writing-latex)
+- [Viewing the PDF](#viewing-the-pdf)
+- [Build options](#build-options)
+- [Supported files](#supported-files)
 - [Overleaf sync](#overleaf-sync)
 - [Commands and keyboard shortcuts](#commands-and-keyboard-shortcuts)
 - [Settings](#settings)
@@ -37,6 +44,47 @@
 | ✂️ **Select and copy** | Drag across text in the PDF and press ⌘C. |
 | 🚨 **Clickable errors** | Errors are listed above the PDF and in the Problems panel; the last good PDF stays visible. |
 | ☁️ **Two-way Overleaf sync** | Saves are pushed, Overleaf changes are pulled, and conflicts open in VS Code's merge editor. |
+| 💡 **Suggestions** | `\cite` keys from your `.bib` files, `\ref` labels, commands, environments, file paths and packages. |
+| 🔍 **Hover previews** | Rendered math, citation details, referenced equations, figures and package links. |
+| 🗂️ **Outline and folding** | Sections, figures and tables in the Outline view and breadcrumbs; fold sections and environments. |
+| ✍️ **Editing helpers** | Bold or italicise the selection, wrap it in an environment, continue `\item` lists, close environments. |
+| 🧹 **Format and lint** | Format Document for `.tex` and `.bib`, warnings for duplicate labels, optional ChkTeX. |
+| 🔣 **Symbol palette** | Click to insert Greek letters, relations, arrows, accents, matrices, figures and tables. |
+| 🌐 **Preview in the browser** | The same live preview in a browser tab, still synced with the editor. |
+| 🔢 **Word count** | Words in the status bar; characters and per-file counts one click away. |
+
+---
+
+## Complete feature list
+
+**Preview and build**
+- Side-by-side PDF preview that rebuilds when you save `.tex`, `.bib`, `.sty`, `.cls`, `.rnw` or `.jnw` files, keeping your place.
+- Live preview in a browser tab (↗ in the preview), PDF in your external viewer, and a dark-PDF toggle (◐).
+- **Sections** menu in the preview: the document's numbered headings; pick one to scroll there.
+- SyncTeX both ways: double-click the PDF to reach the source; ⌥⌘J / Ctrl+Alt+J to reach the PDF.
+- Clickable links in the PDF, text selection and copy, zoom (buttons, Fit, ⌘/Ctrl + wheel).
+- Errors listed above the PDF and in the Problems panel; the last good PDF stays visible.
+- latexmk, tectonic, pdflatex, xelatex or lualatex (with BibTeX); your own build command; Docker; knitr/Weave.
+- Stop a compile, clean auxiliary files, show the full log; **TeX** status bar menu for all of these.
+- Main file found automatically (or via `% !TEX root`); `\input`, `\include`, `\subfile` and `\import` followed.
+- Two-way Overleaf sync over Git, with conflicts resolved in VS Code's merge editor.
+
+**Writing**
+- Suggestions for `\cite` (from `.bib` files and `thebibliography`, searchable by author or title), `\ref` (with printed numbers), 220+ commands with their symbols, your own macros, environments with the matching `\end`, file paths and packages.
+- `@` shortcuts (`@a` → `\alpha`, `@/` → `\frac`, `@R` → `ℝ` …) and uppercase shortcuts (`BEQ` → equation, `FBF` → `\textbf` …).
+- Hover previews: rendered math with your macros; citation details; referenced equations, captions and sections; figure thumbnails (PDF figures too); package and command help with the symbol's glyph.
+- Symbols palette (⌃L P) and **Insert Symbol…** (⌃L .) with recent symbols and search; math symbols get `$…$` outside math, and a selection becomes the first argument.
+- One-key formatting: bold, italic, emphasis, typewriter, underline, small caps, footnote, inline math (press again to remove; math variants inside math).
+- Surround with any command or environment; close the open environment; toggle `\[ \]` ⇄ `equation*`; toggle `*` on headings and environments; promote/demote headings; jump between `\begin` and `\end`.
+- `\item` lists continue on Enter; Enter on an empty `\item` leaves the list.
+- **LaTeX** submenu in the editor's right-click menu with all of the above.
+
+**Navigating and checking**
+- Outline, breadcrumbs and Go to Symbol with numbered headings (1, 1.2, A for appendices) across all files, plus figures, tables, theorems, frames, abstract and references.
+- Folding for sections, environments, comment blocks and `% region` markers; Expand Selection through math and environments; linked `\begin`/`\end` renaming.
+- Word count in the status bar (and for the selection); details with characters, formulas and a per-file breakdown.
+- Format Document for `.tex` (latexindent or built-in) and `.bib`; duplicate-label warnings; optional ChkTeX linting.
+- Works in Remote SSH, WSL and Dev Containers.
 
 ---
 
@@ -151,6 +199,167 @@ Opening the preview from any of those files then shows the main document, and sa
 
 ---
 
+## Writing LaTeX
+
+All of this works in `.tex` files with no setup, and it reads the whole project: the main file and everything it `\input`s or `\include`s.
+
+### Suggestions
+
+- **`\cite{`** suggests keys from the `.bib` files named in `\bibliography` or `\addbibresource`, and from a `thebibliography` block. You can type part of an author's name or the title to find the key.
+- **`\ref{`**, `\eqref{`, `\cref{` and similar suggest your labels. After a latexmk or pdflatex compile, the printed number is shown next to each one.
+- **`\`** suggests more than 220 commands, showing each symbol's glyph next to it (`\alpha  α`, `\Rightarrow  ⇒`), plus the macros defined with `\newcommand` in your project.
+- **`\begin{`** suggests environments and inserts the matching `\end`. **`\end{`** suggests the environment that is still open.
+- **`\includegraphics{`**, **`\input{`** and **`\bibliography{`** suggest files and folders from the project.
+- **`\usepackage{`** suggests common packages.
+
+<img src="docs/images/completion-cite.png" alt="\cite suggestions with the entry's title, authors and year" width="49%"> <img src="docs/images/completion-symbols.png" alt="Command suggestions showing each symbol's glyph" width="49%">
+
+**Shortcuts**, offered as suggestions:
+
+| Type | Get |
+|---|---|
+| `@a` … `@z`, `@D`, `@G`, `@L` … | Greek letters: `\alpha`, `\Delta`, `\Gamma`, `\Lambda` … (`@ve` gives `\varepsilon`, `@vf` gives `\varphi`) |
+| `@/` `@%` `@2` `@3` | `\frac{}{}`, `\frac{\partial}{\partial}`, `\sqrt{}`, `\sqrt[3]{}` |
+| `@(` `@[` `@{` `@\|` | `\left( \right)` and the other auto-sized delimiters |
+| `@I` `@N` `@T` | `\int_{}^{}`, `\sum_{}^{}`, `\prod_{}^{}` |
+| `@R` `@C` `@Z` `@E` | `\mathbb{R}`, `\mathbb{C}`, `\mathbb{Z}`, `\mathbb{E}` |
+| `@<` `@>` `@!` `@=` `@8` `@6` `@0` | `\leq`, `\geq`, `\neq`, `\equiv`, `\infty`, `\partial`, `\emptyset` |
+| `@^` `@_` `@~` `@.` `@:` | `\hat{}`, `\bar{}`, `\tilde{}`, `\dot{}`, `\ddot{}` |
+| `@*` `@+` `@-` `@@` `@;` `@,` | `\times`, `\cup`, `\cap`, `\circ`, `\mid`, `\nonumber` |
+| `BEQ` `BAL` `BGA` `BMU` `BIT` `BEN` `BFI` `BTA` `BTB` `BPM` `BCAS` … | `\begin{equation}`, `align`, `gather`, `multline`, `itemize`, `enumerate`, `figure`, `table`, `tabular`, `pmatrix`, `cases` … (`BS…` gives the starred form, e.g. `BSEQ` → `equation*`) |
+| `FBF` `FIT` `FEM` `FTT` `FSC` `FSF` `FUL` | `\textbf{}`, `\textit{}`, `\emph{}`, `\texttt{}`, `\textsc{}`, `\textsf{}`, `\underline{}` |
+| `MBB` `MCA` `MBF` `MRM` `MFR` `MSC` `MBS` | `\mathbb{}`, `\mathcal{}`, `\mathbf{}`, `\mathrm{}`, `\mathfrak{}`, `\mathscr{}`, `\boldsymbol{}` |
+
+<img src="docs/images/completion-at.png" alt="Typing @ lists the math shortcuts" width="560">
+
+### Symbol palette
+
+Click the **∑-style operator icon** in the editor's title bar (next to the T<sub>E</sub>X preview button), press ⌃L P / Alt+L P, or pick **Show Symbol Palette** from the **TeX** status bar menu. The palette opens as a **LaTeX Symbols** tab in the bottom panel; drag the tab to the sidebar if you prefer it there. **TeX: Insert Symbol…** (⌃L . / Alt+L .) for the same list in a searchable picker. There are ten groups: Greek, Structures (fractions, roots, sums, delimiters, matrices, cases), Accents, Fonts, Relations, Operators, Arrows, Misc, Text and Blocks (figure, table, lists, equations, theorem, proof, frame). Search by name ("arrow", "matrix", "norm"); the symbols you used last appear at the top.
+
+Click a symbol to insert it at the cursor:
+- A math symbol inserted outside math is wrapped in `$…$` (matrices and cases in `\[…\]`).
+- If text is selected, it becomes the first argument: select `x+1` and click the fraction to get `\frac{x+1}{}`.
+
+![The Symbols palette in the bottom panel: Greek letters, structures, accents and more](docs/images/symbols-palette.png)
+
+![TeX: Insert Symbol… lists every symbol with its command](docs/images/insert-symbol.png)
+
+### Hover previews
+
+Hover over:
+
+- **math** (`$…$`, `\[…\]`, `equation`, `align`, …) to see it rendered, with your own `\newcommand` macros;
+- **a citation key** for the title, authors, year and venue, with a link to the entry;
+- **a reference** for what it points to: the rendered equation, the figure or table caption, or the section;
+- **an `\includegraphics` path** for a thumbnail (PNG, JPG, SVG, and PDF/EPS through Ghostscript or, on macOS, the built-in `sips`);
+- **a package name** for a link to its CTAN documentation, and **a command** for its symbol and a one-line description.
+
+<img src="docs/images/hover-math.png" alt="Hovering a displayed equation renders it" width="49%"> <img src="docs/images/hover-ref.png" alt="Hovering \eqref shows the referenced equation" width="49%">
+<img src="docs/images/hover-cite.png" alt="Hovering a citation key shows the entry" width="49%"> <img src="docs/images/hover-image.png" alt="Hovering \includegraphics shows the figure" width="49%">
+
+### Outline, folding and selection
+
+- The **Outline** view, breadcrumbs and **Go to Symbol** (⇧⌘O) show the document as it will be numbered: `1 Introduction`, `2.3 Results`, `A Proofs` after `\appendix`. Numbers are counted across the whole project, so an included chapter file shows its real numbers. Headings are shown without LaTeX markup.
+- Also listed: figures and tables (with their captions), theorems, lemmas and definitions (with their optional titles, and your own `\newtheorem`s), Beamer frames, the abstract and the references.
+
+![Go to Symbol lists the numbered sections, theorems and figures](docs/images/goto-symbol.png)
+- **Folding** works on sections, environments, runs of comments and `% region` / `% endregion` markers.
+- **Expand Selection** (⌃⇧⌘→ / Shift+Alt+→) grows from a word to the math or environment contents, then to the whole environment.
+- With `"editor.linkedEditing": true`, renaming `\begin{foo}` renames its `\end{foo}` too.
+
+### Editing helpers
+
+All of these work with several cursors. They use ⌃L on macOS and Alt+L on Windows/Linux, then a key, so VS Code's own ⌘L / Ctrl+L stays as it is. Every action is also in the **LaTeX** submenu of the editor's right-click menu.
+
+<img src="docs/images/context-menu-latex.png" alt="The editor's right-click menu with the LaTeX submenu" width="560">
+
+| Action | macOS | Windows / Linux |
+|---|---|---|
+| Bold: `\textbf`, or `\mathbf` in math (press again to remove) | ⌃L B | Alt+L B |
+| Italic: `\textit` / `\mathit` | ⌃L I | Alt+L I |
+| Emphasis: `\emph` | ⌃L E | Alt+L E |
+| Typewriter: `\texttt` / `\mathtt` | ⌃L T | Alt+L T |
+| Underline | ⌃L U | Alt+L U |
+| Small caps: `\textsc` | ⌃L S | Alt+L S |
+| Footnote around the selection | ⌃L F | Alt+L F |
+| Inline math `$…$` (press again to remove) | ⌃L 4 | Alt+L 4 |
+| Surround with a command… (40 common ones, or any) | ⌃L W | Alt+L W |
+| Surround with an environment… | ⌃L N | Alt+L N |
+| Close the current environment | ⌃L C | Alt+L C |
+| Toggle `\[ … \]` and `equation*` | ⌃L M | Alt+L M |
+| Toggle `*`: `\section` ⇄ `\section*`, `equation` ⇄ `equation*` | ⌃L 8 | Alt+L 8 |
+| Promote heading (`\subsection` → `\section`) | ⌃L ↑ | Alt+L ↑ |
+| Demote heading (`\section` → `\subsection`) | ⌃L ↓ | Alt+L ↓ |
+| Jump between `\begin` and `\end` | ⌃L J | Alt+L J |
+| Insert Symbol… | ⌃L . | Alt+L . |
+| Show the Symbols palette | ⌃L P | Alt+L P |
+| Word count details | ⌃L ⌃C | Alt+L Alt+C |
+
+**Lists:** pressing Enter at the end of an `\item` line starts the next `\item`. Pressing Enter on an empty `\item` removes it and steps out of the list.
+
+**Word count:** the status bar shows the project's word count while a LaTeX file is open, or *"120 of 8,314 words"* when text is selected. Click it for characters (with and without spaces), the number of formulas and a count for each file. Math, commands and comments aren't counted as words.
+
+![The word count details: words, characters and formulas](docs/images/word-count.png)
+
+### Formatting and linting
+
+- **Format Document** (⇧⌥F) re-indents `.tex` files by environment, using `latexindent` if it's installed. In `.bib` files it puts one field per line, aligns the `=` signs and leaves a blank line between entries.
+- **Duplicate labels** are flagged in the Problems panel as you type, across all the project's files.
+- **ChkTeX:** set `texPreview.chktex` to `true` to lint as you type (ChkTeX comes with TeX Live).
+
+---
+
+## Viewing the PDF
+
+| Where | How |
+|---|---|
+| **Beside the editor** | The **T<sub>E</sub>X** button, ⌥⌘V / Ctrl+Alt+V, or any of the right-click menus. |
+| **In a web browser** | **↗** in the preview's toolbar, **TeX: Open Preview in Browser**, or the **TeX** status bar menu. It's the same viewer, updated live after each compile. Double-click jumps to VS Code, ⌥⌘J scrolls the browser, and the Sections menu works. It's served from your machine only (`127.0.0.1`, with a private link), and forwarded automatically in remote sessions. |
+| **In another PDF app** | **TeX: Open PDF in External Viewer** opens the system's PDF app, or the command in `texPreview.externalViewer.command`. The PDF is still rebuilt on save. **Jump to Location in PDF** runs `texPreview.externalViewer.syncCommand` (for example Skim's `displayline`). For inverse search, set the viewer to run `code -g %file:%line`. |
+
+In the preview toolbar:
+- **☰ Sections** lists the numbered headings; pick one to scroll there.
+- **◐** shows the PDF with dark pages. `texPreview.invertPdf` sets the default.
+- **−**, **Fit** and **+** zoom.
+
+The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompile, Stop, Open Preview, Open in Browser, Open in External Viewer, Jump to Location, Word Count, Insert Symbol, Clean, Show Log.
+
+![The live preview in a web browser, with the Sections menu open](docs/images/browser-preview.png)
+
+<img src="docs/images/dark-pdf.png" alt="The preview with dark pages" width="49%"> <img src="docs/images/tex-menu.png" alt="The TeX status bar menu" width="49%">
+
+---
+
+## Build options
+
+| Need | How |
+|---|---|
+| Stop a long compile | **TeX: Stop Compiling** |
+| Remove `.aux`, `.log`, `.synctex.gz` and similar files | **TeX: Clean Auxiliary Files**. The PDF is kept. |
+| Use your own build | Set `texPreview.buildCommand`, e.g. `latexmk -pdf -outdir=%OUTDIR% %DOC%`. Errors and SyncTeX work as usual. |
+| Build with no local TeX install | Set `texPreview.docker.image`, e.g. `texlive/texlive`. The compiler runs in that container. |
+| Knitr or Weave documents | `.rnw` files are knitted with `Rscript` and `.jnw` files are woven with Julia before compiling. |
+| Main file without a magic comment | Found automatically: a file without `\documentclass` is built through the file that `\input`s it. |
+| Remote SSH, WSL, Dev Containers | The extension runs where your files are, so it uses the TeX installation there. |
+
+---
+
+## Supported files
+
+| File | What you get |
+|---|---|
+| `.tex`, `.ltx` | Everything: preview, build, suggestions, hovers, Outline, folding, formatting, linting, editing commands. A file is built as the main document if it has `\documentclass`; otherwise through the file that includes it, or the one named in `% !TEX root = …`. |
+| `.sty`, `.cls` | Suggestions, hovers, folding and formatting; saving rebuilds open previews. |
+| `.bib` | Source of `\cite` suggestions and hovers; **Format Document** tidies entries; saving rebuilds. |
+| `thebibliography` in a `.tex` file | `\bibitem` keys are suggested and previewed like `.bib` entries. |
+| `.rnw` / `.Rnw` (knitr), `.jnw` (Weave.jl) | Woven to `.tex` and then built and previewed. |
+| `.bst`, `.tikz` | Saving rebuilds open previews. |
+| Images: `.pdf`, `.png`, `.jpg`, `.jpeg`, `.eps`, `.svg`, `.gif` | Suggested in `\includegraphics`, with a thumbnail on hover. `\graphicspath` is respected. |
+| Included files | `\input`, `\include`, `\subfile`, `\import` / `\subimport` are followed for labels, citations, macros, numbering and word count. |
+| Build output: `.pdf`, `.synctex.gz`, `.log`, `.aux` | PDF shown in the preview; SyncTeX for jumping; log parsed for errors; `.aux` read for reference numbers. All kept in `.texbuild/` by default. |
+
+---
+
 ## Overleaf sync
 
 TeX Side Preview can keep a local folder and an Overleaf project in sync **in both directions**, with no manual pull or push. It uses Overleaf's official Git integration, which needs an Overleaf plan that includes Git (premium or institutional).
@@ -209,18 +418,62 @@ If you and a collaborator change the same line, the status bar turns to **⚠ Ov
 
 ## Commands and keyboard shortcuts
 
-| Command | macOS | Windows / Linux | Where else |
+Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** or **Overleaf:**. On macOS the editing keys are ⌃L then a key; on Windows/Linux, Alt+L then a key.
+
+**Preview and build**
+
+| Command | macOS | Windows / Linux | Also in |
 |---|---|---|---|
 | **TeX: Open TeX Preview to the Side** | ⌥⌘V | Ctrl+Alt+V | Title-bar button; Explorer, editor and tab right-click menus |
-| **TeX: Jump to Location in PDF** | ⌥⌘J | Ctrl+Alt+J | Editor right-click menu |
 | **TeX: Recompile** (saves first) | ⌘↵ | Ctrl+Enter | *Recompile* button in the preview |
-| **TeX: Show Compile Log** | | | Click **TeX** in the status bar |
-| **Overleaf: Clone Project…** | | | |
-| **Overleaf: Sync Now** | | | Overleaf status bar menu |
-| **Overleaf: Sync Actions…** | | | Click **Overleaf** in the status bar |
-| **Overleaf: Set Git Token…** | | | Overleaf status bar menu |
+| **TeX: Jump to Location in PDF** | ⌥⌘J | Ctrl+Alt+J | Editor right-click menu |
+| **TeX: Open Preview in Browser** | | | ↗ in the preview; title-bar `···` menu; LaTeX right-click submenu |
+| **TeX: Open PDF in External Viewer** | | | LaTeX right-click submenu |
+| **TeX: Stop Compiling** | | | TeX status bar menu |
+| **TeX: Clean Auxiliary Files** | | | LaTeX right-click submenu |
+| **TeX: Show Compile Log** | | | TeX status bar menu |
+| **TeX: TeX Actions…** | | | Click **TeX** in the status bar |
 
-In the PDF: **double-click** jumps to the source, **⌘C** copies the selection, and **⌘/Ctrl + mouse wheel** zooms.
+**Editing**
+
+| Command | macOS | Windows / Linux |
+|---|---|---|
+| **TeX: Bold** / **Italic** / **Emphasis** / **Typewriter** / **Underline** | ⌃L B / I / E / T / U | Alt+L B / I / E / T / U |
+| **TeX: Small Caps** / **Footnote** | ⌃L S / F | Alt+L S / F |
+| **TeX: Inline Math $…$** | ⌃L 4 | Alt+L 4 |
+| **TeX: Surround with Command…** | ⌃L W | Alt+L W |
+| **TeX: Surround with Environment…** | ⌃L N | Alt+L N |
+| **TeX: Close Current Environment** | ⌃L C | Alt+L C |
+| **TeX: Toggle `\[ \]` and `equation*`** | ⌃L M | Alt+L M |
+| **TeX: Toggle Star (numbered / unnumbered)** | ⌃L 8 | Alt+L 8 |
+| **TeX: Promote Heading** / **Demote Heading** | ⌃L ↑ / ↓ | Alt+L ↑ / ↓ |
+| **TeX: Go to Matching \begin / \end** | ⌃L J | Alt+L J |
+| **TeX: Insert Symbol…** | ⌃L . | Alt+L . |
+| **TeX: Show Symbol Palette** (also the operator icon in the editor title bar) | ⌃L P | Alt+L P |
+| **TeX: Count Words** | ⌃L ⌃C | Alt+L Alt+C |
+| End list (Enter on an empty `\item`) | ↵ | Enter |
+
+**VS Code's own keys, powered by the extension**
+
+| Action | macOS | Windows / Linux |
+|---|---|---|
+| Suggestions | ⌃Space | Ctrl+Space |
+| Go to Symbol (headings, figures, theorems) | ⇧⌘O | Ctrl+Shift+O |
+| Expand / shrink selection | ⌃⇧⌘→ / ← | Shift+Alt+→ / ← |
+| Format Document | ⇧⌥F | Shift+Alt+F |
+| Fold / unfold | ⌥⌘[ / ] | Ctrl+Shift+[ / ] |
+| Show hover | ⌘K ⌘I | Ctrl+K Ctrl+I |
+
+**Overleaf**
+
+| Command | Where |
+|---|---|
+| **Overleaf: Clone Project…** | Command Palette |
+| **Overleaf: Sync Now** | Overleaf status bar menu |
+| **Overleaf: Sync Actions…** | Click **Overleaf** in the status bar |
+| **Overleaf: Set Git Token…** | Overleaf status bar menu |
+
+**In the PDF** (panel or browser): **double-click** jumps to the source, **⌘C** copies the selection, **⌘/Ctrl + mouse wheel** zooms, and **☰ Sections** jumps to a heading.
 
 ---
 
@@ -233,6 +486,12 @@ In the PDF: **double-click** jumps to the source, **⌘C** copies the selection,
 | `texPreview.outDir` | `.texbuild` | Where the PDF and auxiliary files go, relative to the main `.tex` file. Use `.` to build next to the source. |
 | `texPreview.compileOnSave` | `true` | Recompile when a `.tex`/`.bib`/`.sty`/`.cls` file is saved. |
 | `texPreview.extraPath` | `[]` | Extra folders to search for TeX programs. |
+| `texPreview.buildCommand` | `""` | A shell command that replaces the built-in build. Placeholders: `%DOC%`, `%DOCFILE%`, `%TEX%`, `%DIR%`, `%OUTDIR%`. |
+| `texPreview.docker.image` | `""` | Run the compiler inside this Docker image. |
+| `texPreview.invertPdf` | `never` | `never`, `darkTheme` or `always`: show the PDF with dark pages. |
+| `texPreview.chktex` | `false` | Lint `.tex` files with ChkTeX as you type. |
+| `texPreview.externalViewer.command` | `""` | Command that opens the PDF externally (`%PDF%`). Empty uses the system default. |
+| `texPreview.externalViewer.syncCommand` | `""` | Forward search in the external viewer (`%PDF%`, `%TEX%`, `%LINE%`). |
 | `texPreview.overleaf.autoSync` | `true` | Two-way sync for folders cloned from Overleaf. |
 | `texPreview.overleaf.pullInterval` | `60` | Seconds between checks for changes on Overleaf (minimum 15). |
 | `texPreview.overleaf.pushDelay` | `2` | Seconds after a save before pushing. |
@@ -266,6 +525,14 @@ Or open this folder in VS Code and press **F5** to start an Extension Developmen
 | File | Purpose |
 |---|---|
 | `extension.js` | Commands, compiling, log parsing, the preview panel |
+| `project.js` | Finds the main file and reads labels, citations and macros across the project |
+| `language.js`, `data.js`, `symbols.js` | Suggestions and hover previews; the built-in command list and the symbol catalogue |
+| `palette.js` | The Symbols panel and **Insert Symbol…** |
+| `server.js` | Serves the live preview to a web browser |
+| `math.js` | Finds math in a document and renders it with MathJax for hovers |
+| `structure.js` | Outline, folding, Expand Selection, linked `\begin`/`\end`, word count |
+| `editing.js` | Editing commands, `\item` lists, the word count, formatting, duplicate-label and ChkTeX diagnostics |
+| `tools.js` | Finding and running external programs |
 | `synctex.js` | SyncTeX reader (PDF ↔ source positions) |
 | `overleaf.js` | Two-way Overleaf sync over Git |
 | `media/viewer.js`, `media/viewer.css` | The PDF viewer inside the preview (pdf.js, text layer, links) |

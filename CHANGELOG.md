@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.0
+- **Suggestions:** `\cite` keys (from `.bib` files or `thebibliography`), `\ref` labels with their printed numbers, commands and your own macros, environments (with the matching `\end`), file paths, packages, `@` Greek/math shortcuts, and `BEQ` / `FIT`-style shortcuts.
+- **Hover previews:** rendered math (with your macros), citation details, referenced equations and captions, figure thumbnails (including PDF figures), package documentation links, and command descriptions.
+- **Outline, breadcrumbs and Go to Symbol** for sections, figures, tables and frames; **folding** of sections, environments, comments and regions; **Expand Selection** through math and environments; linked editing of `\begin`/`\end` names.
+- **Editing commands** (⌃L / Alt+L, then a key): bold, italic, emphasis, typewriter, underline (press again to remove; math variants inside math), surround with a command or environment, close the current environment, toggle `\[ \]` and `equation*`, jump between `\begin` and `\end`.
+- `\item` lists continue when you press Enter, and an empty `\item` ends the list.
+- **Format Document** for `.tex` (latexindent, or built-in re-indenting) and `.bib`.
+- Duplicate-label warnings, and optional ChkTeX linting (`texPreview.chktex`).
+- **TeX: Count Words**, **TeX: Stop Compiling** and **TeX: Clean Auxiliary Files**.
+- The main file is found automatically, without a `% !TEX root` comment.
+- Custom build command (`texPreview.buildCommand`), Docker builds (`texPreview.docker.image`), and `.rnw` / `.jnw` documents.
+- Dark PDF mode (◐ in the preview, or `texPreview.invertPdf`).
+- **Live preview in a web browser** (↗ in the preview), with SyncTeX both ways.
+- **Sections** menu in the preview; the Outline numbers headings as the PDF does (including appendices) and lists theorems, the abstract and references.
+- **Symbols palette** in the bottom panel and **TeX: Insert Symbol…**, with about 300 symbols, structures and blocks; symbol glyphs in suggestions and hovers.
+- Word count in the status bar, with characters, formulas and a per-file breakdown.
+- More editing keys: small caps, footnote, inline math, toggle `*`, promote/demote headings; a **LaTeX** submenu in the editor's right-click menu; the **TeX** status bar menu.
+- External PDF viewer with forward search (`texPreview.externalViewer.*`).
+- Runs on the remote side in Remote SSH, WSL and Dev Containers.
+
 ## 1.0.0
 First public release on the VS Code Marketplace and Open VSX.
 

@@ -16,3 +16,10 @@ media/logo.svg
 docs/**
 .gitignore
 test/**
+node_modules/mathjax/**
+!node_modules/mathjax/package.json
+!node_modules/mathjax/es5/node-main.js
+!node_modules/mathjax/es5/input/tex-full.js
+!node_modules/mathjax/es5/output/svg.js
+!node_modules/mathjax/es5/output/svg/fonts/tex.js
+!node_modules/mathjax/LICENSE
