@@ -2,7 +2,7 @@
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview",
   "description": "Overleaf-style side-by-side LaTeX preview with SyncTeX, plus completions, hover previews, outline and two-way Overleaf sync — native to VS Code.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {
@@ -233,6 +233,112 @@
         "command": "texPreview.menu",
         "title": "TeX Actions…",
         "category": "TeX"
+      },
+      {
+        "command": "texPreview.review.toggleTracking",
+        "title": "Track Changes",
+        "category": "TeX Review",
+        "icon": "$(record)",
+        "toggled": "texPreview.tracking"
+      },
+      {
+        "command": "texPreview.review.accept",
+        "title": "Accept Change",
+        "category": "TeX Review",
+        "icon": "$(check)"
+      },
+      {
+        "command": "texPreview.review.reject",
+        "title": "Reject Change",
+        "category": "TeX Review",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "texPreview.review.acceptAll",
+        "title": "Accept All Changes in File",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.rejectAll",
+        "title": "Reject All Changes in File",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.nextChange",
+        "title": "Next Change",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.previousChange",
+        "title": "Previous Change",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.menu",
+        "title": "Review…",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.createComment",
+        "title": "Add Comment",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.reply",
+        "title": "Reply",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.resolve",
+        "title": "Resolve",
+        "category": "TeX Review",
+        "icon": "$(check)"
+      },
+      {
+        "command": "texPreview.review.reopen",
+        "title": "Reopen",
+        "category": "TeX Review",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "texPreview.review.deleteThread",
+        "title": "Delete Thread",
+        "category": "TeX Review",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "texPreview.review.editComment",
+        "title": "Edit",
+        "category": "TeX Review",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "texPreview.review.deleteComment",
+        "title": "Delete",
+        "category": "TeX Review",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "texPreview.review.saveComment",
+        "title": "Save",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.cancelEdit",
+        "title": "Cancel",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.addComment",
+        "title": "Add Comment",
+        "category": "TeX Review",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "texPreview.review.showComments",
+        "title": "Show All Comments",
+        "category": "TeX Review",
+        "icon": "$(comment-discussion)"
       }
     ],
     "menus": {
@@ -282,6 +388,21 @@
           "submenu": "texPreview.latex",
           "when": "editorLangId =~ /^(la)?tex$/",
           "group": "navigation@92"
+        },
+        {
+          "command": "texPreview.review.accept",
+          "when": "editorLangId =~ /^(la)?tex$/ && texPreview.onChange",
+          "group": "navigation@93"
+        },
+        {
+          "command": "texPreview.review.reject",
+          "when": "editorLangId =~ /^(la)?tex$/ && texPreview.onChange",
+          "group": "navigation@94"
+        },
+        {
+          "command": "texPreview.review.addComment",
+          "when": "editorLangId =~ /^(la)?tex$/ && editorHasSelection",
+          "group": "navigation@95"
         }
       ],
       "commandPalette": [
@@ -364,6 +485,70 @@
         {
           "command": "texPreview.toggleStar",
           "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.review.createComment",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.reply",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.resolve",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.reopen",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.deleteThread",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.editComment",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.deleteComment",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.saveComment",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.cancelEdit",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.accept",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.review.reject",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.review.acceptAll",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.review.rejectAll",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.review.nextChange",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.review.previousChange",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.review.addComment",
+          "when": "editorLangId =~ /^(la)?tex$/"
         }
       ],
       "texPreview.latex": [
@@ -381,7 +566,12 @@
         },
         {
           "submenu": "texPreview.structure",
-          "group": "1_edit@4"
+          "group": "1_edit@4",
+          "when": "texPreview.structure"
+        },
+        {
+          "submenu": "texPreview.reviewMenu",
+          "group": "1_edit@5"
         },
         {
           "command": "texPreview.insertSymbol",
@@ -445,27 +635,131 @@
       "texPreview.structure": [
         {
           "command": "texPreview.promoteSection",
-          "group": "1@0"
+          "group": "1_heading@1",
+          "when": "texPreview.onHeading"
         },
         {
           "command": "texPreview.demoteSection",
-          "group": "1@1"
+          "group": "1_heading@2",
+          "when": "texPreview.onHeading"
         },
         {
           "command": "texPreview.toggleStar",
-          "group": "1@2"
-        },
-        {
-          "command": "texPreview.closeEnvironment",
-          "group": "2@3"
+          "group": "1_heading@3",
+          "when": "texPreview.canStar"
         },
         {
           "command": "texPreview.toggleDisplayMath",
-          "group": "2@4"
+          "group": "2_env@1",
+          "when": "texPreview.inDisplayMath"
+        },
+        {
+          "command": "texPreview.closeEnvironment",
+          "group": "2_env@2",
+          "when": "texPreview.canCloseEnvironment"
         },
         {
           "command": "texPreview.gotoMatchingEnvironment",
-          "group": "2@5"
+          "group": "2_env@3",
+          "when": "texPreview.inEnvironment"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "texPreview.review.createComment",
+          "group": "inline",
+          "when": "commentController == texReview && commentThreadIsEmpty"
+        },
+        {
+          "command": "texPreview.review.reply",
+          "group": "inline",
+          "when": "commentController == texReview && !commentThreadIsEmpty"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "texPreview.review.resolve",
+          "group": "inline@1",
+          "when": "commentController == texReview && commentThread == open"
+        },
+        {
+          "command": "texPreview.review.reopen",
+          "group": "inline@1",
+          "when": "commentController == texReview && commentThread == resolved"
+        },
+        {
+          "command": "texPreview.review.deleteThread",
+          "group": "inline@2",
+          "when": "commentController == texReview && !commentThreadIsEmpty"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "texPreview.review.editComment",
+          "group": "inline@1",
+          "when": "commentController == texReview && comment == mine"
+        },
+        {
+          "command": "texPreview.review.deleteComment",
+          "group": "inline@2",
+          "when": "commentController == texReview && comment == mine"
+        }
+      ],
+      "comments/comment/context": [
+        {
+          "command": "texPreview.review.cancelEdit",
+          "group": "inline@1",
+          "when": "commentController == texReview"
+        },
+        {
+          "command": "texPreview.review.saveComment",
+          "group": "inline@2",
+          "when": "commentController == texReview"
+        }
+      ],
+      "texPreview.reviewMenu": [
+        {
+          "command": "texPreview.review.toggleTracking",
+          "group": "1_track@1"
+        },
+        {
+          "command": "texPreview.review.addComment",
+          "group": "2_comment@1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "texPreview.review.showComments",
+          "group": "2_comment@2"
+        },
+        {
+          "command": "texPreview.review.accept",
+          "group": "3_change@1",
+          "when": "texPreview.onChange"
+        },
+        {
+          "command": "texPreview.review.reject",
+          "group": "3_change@2",
+          "when": "texPreview.onChange"
+        },
+        {
+          "command": "texPreview.review.acceptAll",
+          "group": "4_all@1",
+          "when": "texPreview.hasChanges"
+        },
+        {
+          "command": "texPreview.review.rejectAll",
+          "group": "4_all@2",
+          "when": "texPreview.hasChanges"
+        },
+        {
+          "command": "texPreview.review.nextChange",
+          "group": "5_nav@1",
+          "when": "texPreview.hasChanges"
+        },
+        {
+          "command": "texPreview.review.previousChange",
+          "group": "5_nav@2",
+          "when": "texPreview.hasChanges"
         }
       ]
     },
@@ -603,6 +897,42 @@
         "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
       },
       {
+        "command": "texPreview.review.toggleTracking",
+        "key": "alt+l r",
+        "mac": "ctrl+l r",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.review.addComment",
+        "key": "alt+l k",
+        "mac": "ctrl+l k",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.review.accept",
+        "key": "alt+l a",
+        "mac": "ctrl+l a",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.review.reject",
+        "key": "alt+l x",
+        "mac": "ctrl+l x",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.review.nextChange",
+        "key": "alt+l ]",
+        "mac": "ctrl+l ]",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.review.previousChange",
+        "key": "alt+l [",
+        "mac": "ctrl+l [",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
         "command": "texPreview.endList",
         "key": "enter",
         "when": "editorTextFocus && editorLangId == latex && texPreview.emptyItem && !suggestWidgetVisible && !inSnippetMode"
@@ -708,6 +1038,11 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Forward search in the external viewer, used by **Jump to Location in PDF** when the PDF is open externally. Placeholders `%PDF%`, `%TEX%`, `%LINE%`, e.g. `/Applications/Skim.app/Contents/SharedSupport/displayline -r %LINE% %PDF% %TEX%`."
+        },
+        "texPreview.review.author": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Your name on comments and tracked changes. Empty uses Git's `user.name`."
         }
       }
     },
@@ -723,6 +1058,10 @@
       {
         "id": "texPreview.structure",
         "label": "Structure"
+      },
+      {
+        "id": "texPreview.reviewMenu",
+        "label": "Review"
       }
     ],
     "viewsContainers": {

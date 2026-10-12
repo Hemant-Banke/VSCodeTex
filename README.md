@@ -4,7 +4,7 @@
 
 It feels like part of VS Code rather than something bolted on. The LaTeX help works through VS Code's own features: suggestions, hovers, Outline, folding, Format Document, the Problems panel, Expand Selection and the status bar. The only addition is a **Symbols** palette in the bottom panel, which appears only while a LaTeX file is open.
 
-![The editor with the numbered Outline, the PDF preview with its Sections menu, and the word count in the status bar](docs/images/feature-overview.png)
+![The numbered Outline, tracked changes and a comment thread in the editor, the live PDF preview, and the word count and Review items in the status bar](docs/images/feature-overview.png)
 
 **Contents**
 
@@ -25,6 +25,7 @@ It feels like part of VS Code rather than something bolted on. The LaTeX help wo
 - [Viewing the PDF](#viewing-the-pdf)
 - [Build options](#build-options)
 - [Supported files](#supported-files)
+- [Comments and tracked changes](#comments-and-tracked-changes)
 - [Overleaf sync](#overleaf-sync)
 - [Commands and keyboard shortcuts](#commands-and-keyboard-shortcuts)
 - [Settings](#settings)
@@ -52,6 +53,7 @@ It feels like part of VS Code rather than something bolted on. The LaTeX help wo
 | 🔣 **Symbol palette** | Click to insert Greek letters, relations, arrows, accents, matrices, figures and tables. |
 | 🌐 **Preview in the browser** | The same live preview in a browser tab, still synced with the editor. |
 | 🔢 **Word count** | Words in the status bar; characters and per-file counts one click away. |
+| 💬 **Comments and tracked changes** | Review together like on Overleaf, with no markup added to your LaTeX; shared through the Overleaf or Git sync. |
 
 ---
 
@@ -68,6 +70,11 @@ It feels like part of VS Code rather than something bolted on. The LaTeX help wo
 - Stop a compile, clean auxiliary files, show the full log; **TeX** status bar menu for all of these.
 - Main file found automatically (or via `% !TEX root`); `\input`, `\include`, `\subfile` and `\import` followed.
 - Two-way Overleaf sync over Git, with conflicts resolved in VS Code's merge editor.
+
+**Reviewing together**
+- Comment threads on any selection, with replies, editing, resolve and reopen, in VS Code's own Comments UI.
+- Track Changes: your edits become suggestions (insertions highlighted, deletions shown struck through); anyone can accept or reject them, one at a time or all at once.
+- Nothing is added to the LaTeX: review data lives in `.texreview/`, one file per person, and travels with the project through the Overleaf or Git sync.
 
 **Writing**
 - Suggestions for `\cite` (from `.bib` files and `thebibliography`, searchable by author or title), `\ref` (with printed numbers), 220+ commands with their symbols, your own macros, environments with the matching `\end`, file paths and packages.
@@ -269,7 +276,13 @@ Hover over:
 
 ### Editing helpers
 
-All of these work with several cursors. They use ⌃L on macOS and Alt+L on Windows/Linux, then a key, so VS Code's own ⌘L / Ctrl+L stays as it is. Every action is also in the **LaTeX** submenu of the editor's right-click menu.
+All of these work with several cursors. They use ⌃L on macOS and Alt+L on Windows/Linux, then a key, so VS Code's own ⌘L / Ctrl+L stays as it is.
+
+**Right-click** for the same actions. The menu only offers what applies where you clicked:
+- **LaTeX → Format** and **Surround with…** are always there.
+- **LaTeX → Structure** has *Promote/Demote Heading* on a heading, and *Toggle Star* on a heading or in `equation`, `align`, `figure`, `table`… It offers *Toggle `\[ \]` and `equation*`* in display math, and *Close Current Environment* and *Go to Matching `\begin`/`\end`* inside an environment. The submenu is hidden when none of these apply.
+- **Accept Change** and **Reject Change** appear at the top of the menu on a tracked change, and **Add Comment** when text is selected.
+- **LaTeX → Review** shows *Track Changes* with a checkmark when it's on, and *Accept/Reject All* and *Next/Previous Change* only when the file has changes.
 
 <img src="docs/images/context-menu-latex.png" alt="The editor's right-click menu with the LaTeX submenu" width="560">
 
@@ -356,7 +369,63 @@ The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompi
 | `.bst`, `.tikz` | Saving rebuilds open previews. |
 | Images: `.pdf`, `.png`, `.jpg`, `.jpeg`, `.eps`, `.svg`, `.gif` | Suggested in `\includegraphics`, with a thumbnail on hover. `\graphicspath` is respected. |
 | Included files | `\input`, `\include`, `\subfile`, `\import` / `\subimport` are followed for labels, citations, macros, numbering and word count. |
+| `.texreview/*.jsonl` | Comments and tracked changes, one file per person; travels with the project. |
 | Build output: `.pdf`, `.synctex.gz`, `.log`, `.aux` | PDF shown in the preview; SyncTeX for jumping; log parsed for errors; `.aux` read for reference numbers. All kept in `.texbuild/` by default. |
+
+---
+
+## Comments and tracked changes
+
+Review a paper with co-authors the way you would on Overleaf: comment on a passage, suggest edits, and accept or reject them. Nothing is written into your `.tex` files. The PDF, Overleaf and every other tool see plain LaTeX.
+
+![A comment thread with a reply, tracked changes in the text, and the Comments panel](docs/images/review-comments.png)
+
+### Comments
+
+Select some text and press **⌃L K** (Alt+L K on Windows/Linux), or click the **+** in the gutter. Type your comment (Markdown works) and click **Add Comment**. Each thread lets you:
+- **reply**, and **edit** or **delete** your own comments (pencil and bin icons);
+- **resolve** (✓) and reopen it, or delete the whole thread.
+
+The **Comments** panel (bottom panel, next to Problems) lists every thread in the project; click one to jump to it. A comment is attached to the text it was made on, not to a line number. It follows that text as you and your co-authors edit around it. If the text itself is rewritten, the thread stays at its old line, marked *(text changed)*.
+
+### Tracked changes
+
+Press **⌃L R** (Alt+L R), or click **Review** in the status bar and choose **Track Changes**. While it's on, the status bar shows **● Tracking** and your edits become suggestions:
+
+- **Inserted text** is highlighted in green.
+- **Deleted text** stays visible, struck through in red. The file itself no longer contains it, so the PDF shows the proposed version.
+- **Replacing a word** shows the new word highlighted with the old one struck through beside it.
+- Typing a word letter by letter makes one suggestion, and backspacing over your own suggestion just shortens it.
+
+Hover a suggestion to see who made it and when, with **Accept** and **Reject** links. **Accept** keeps the text; **Reject** puts the original back.
+
+![Hovering a suggestion shows its author, the original text, and Accept / Reject](docs/images/review-hover.png)
+
+The same actions are in the lightbulb (⌘. / Ctrl+.) and on the right-click menu: **Accept Change** and **Reject Change** appear at the top when you right-click a suggestion, and **Add Comment** when text is selected.
+
+<img src="docs/images/review-context-menu.png" alt="Right-clicking a suggestion offers Accept Change, Reject Change and Add Comment" width="640">
+
+They're also on these keys:
+
+| Action | macOS | Windows / Linux |
+|---|---|---|
+| Track changes on / off | ⌃L R | Alt+L R |
+| Add a comment on the selection | ⌃L K | Alt+L K |
+| Accept the change at the cursor (or in the selection) | ⌃L A | Alt+L A |
+| Reject the change at the cursor (or in the selection) | ⌃L X | Alt+L X |
+| Next / previous change | ⌃L ] / ⌃L [ | Alt+L ] / Alt+L [ |
+
+Click **Review** in the status bar for the list of the file's suggestions (choose one to jump to it), **Accept All**, **Reject All**, and the comment actions.
+
+![The Review menu: track changes, comments, accept or reject all, and the file's suggestions](docs/images/review-menu.png)
+
+### Working with co-authors
+
+- **Shared with the project:** review data is kept in a `.texreview/` folder at the top of the project, one small file per person. With [Overleaf sync](#overleaf-sync) it's pushed and pulled like any other file; in a Git repository you commit it with your work. Collaborators' comments and suggestions appear after the next sync.
+- **No conflicts:** you only ever write to your own file, so two people reviewing at the same time can't produce a merge conflict in the review data.
+- **Your name** comes from Git (`user.name`); set `texPreview.review.author` to use a different one.
+- **Who sees what:** collaborators see comments and suggestions in VS Code with this extension. People editing on overleaf.com see the current text, but not the comments or suggestions; Overleaf offers no way for other tools to add to its review panel.
+- **Tracking is personal:** turning Track Changes on affects your own edits only. Edits pulled from Overleaf, and edits made while tracking is off, are never recorded as suggestions.
 
 ---
 
@@ -451,6 +520,12 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX: Insert Symbol…** | ⌃L . | Alt+L . |
 | **TeX: Show Symbol Palette** (also the operator icon in the editor title bar) | ⌃L P | Alt+L P |
 | **TeX: Count Words** | ⌃L ⌃C | Alt+L Alt+C |
+| **TeX Review: Toggle Track Changes** | ⌃L R | Alt+L R |
+| Add comment (**Comments: Add Comment on Current Selection**) | ⌃L K | Alt+L K |
+| **TeX Review: Accept Change** / **Reject Change** | ⌃L A / ⌃L X | Alt+L A / Alt+L X |
+| **TeX Review: Next Change** / **Previous Change** | ⌃L ] / ⌃L [ | Alt+L ] / Alt+L [ |
+| **TeX Review: Accept All Changes in File** / **Reject All…** | | |
+| **TeX Review: Review…** (also **Review** in the status bar) | | |
 | End list (Enter on an empty `\item`) | ↵ | Enter |
 
 **VS Code's own keys, powered by the extension**
@@ -492,6 +567,7 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | `texPreview.chktex` | `false` | Lint `.tex` files with ChkTeX as you type. |
 | `texPreview.externalViewer.command` | `""` | Command that opens the PDF externally (`%PDF%`). Empty uses the system default. |
 | `texPreview.externalViewer.syncCommand` | `""` | Forward search in the external viewer (`%PDF%`, `%TEX%`, `%LINE%`). |
+| `texPreview.review.author` | `""` | Your name on comments and tracked changes. Empty uses Git's `user.name`. |
 | `texPreview.overleaf.autoSync` | `true` | Two-way sync for folders cloned from Overleaf. |
 | `texPreview.overleaf.pullInterval` | `60` | Seconds between checks for changes on Overleaf (minimum 15). |
 | `texPreview.overleaf.pushDelay` | `2` | Seconds after a save before pushing. |
@@ -529,6 +605,7 @@ Or open this folder in VS Code and press **F5** to start an Extension Developmen
 | `language.js`, `data.js`, `symbols.js` | Suggestions and hover previews; the built-in command list and the symbol catalogue |
 | `palette.js` | The Symbols panel and **Insert Symbol…** |
 | `server.js` | Serves the live preview to a web browser |
+| `review.js` | Comments and tracked changes: the per-person logs, text anchors, decorations and comment threads |
 | `math.js` | Finds math in a document and renders it with MathJax for hovers |
 | `structure.js` | Outline, folding, Expand Selection, linked `\begin`/`\end`, word count |
 | `editing.js` | Editing commands, `\item` lists, the word count, formatting, duplicate-label and ChkTeX diagnostics |

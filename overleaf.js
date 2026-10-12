@@ -526,4 +526,4 @@ function scheduleFor(uris) {
   for (const repo of repos.values()) if (uris.some((u) => u.scheme === 'file' && repo.contains(u.fsPath))) repo.schedulePush();
 }
 
-module.exports = { activate };
+module.exports = { activate, scheduleFor };

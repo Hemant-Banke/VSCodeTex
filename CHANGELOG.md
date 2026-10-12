@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.1.0
+- **Comments and tracked changes**, without changing your LaTeX: comment threads with replies, editing and resolve in VS Code's Comments UI; Track Changes records your edits as suggestions that anyone can accept or reject. Review data lives in `.texreview/` (one file per person, so it never conflicts) and is shared through the Overleaf or Git sync.
 - **Suggestions:** `\cite` keys (from `.bib` files or `thebibliography`), `\ref` labels with their printed numbers, commands and your own macros, environments (with the matching `\end`), file paths, packages, `@` Greek/math shortcuts, and `BEQ` / `FIT`-style shortcuts.
 - **Hover previews:** rendered math (with your macros), citation details, referenced equations and captions, figure thumbnails (including PDF figures), package documentation links, and command descriptions.
 - **Outline, breadcrumbs and Go to Symbol** for sections, figures, tables and frames; **folding** of sections, environments, comments and regions; **Expand Selection** through math and environments; linked editing of `\begin`/`\end` names.

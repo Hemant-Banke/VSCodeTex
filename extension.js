@@ -13,6 +13,7 @@ const { CompletionProvider, HoverProvider } = require('./language');
 const structure = require('./structure');
 const editing = require('./editing');
 const palette = require('./palette');
+const review = require('./review');
 const { BrowserServer } = require('./server');
 
 /** @type {Map<string, Preview>} keyed by root .tex fsPath */
@@ -77,6 +78,8 @@ function activate(context) {
   );
   editing.activate(context);
   palette.activate(context);
+  // Review logs are written outside any editor, so tell the Overleaf sync about them directly.
+  review.activate(context, { onLogWritten: (uris) => overleaf.scheduleFor(uris) }).catch((e) => output.appendLine(`[review] ${e.stack || e}`));
   const ed = vscode.window.activeTextEditor;
   if (ed && /^(la)?tex$/.test(ed.document.languageId)) setStatus('$(file-pdf) TeX', 'TeX: preview, build and PDF actions');
 

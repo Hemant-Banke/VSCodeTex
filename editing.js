@@ -10,7 +10,7 @@ const fs = require('fs');
 const os = require('os');
 const project = require('./project');
 const math = require('./math');
-const { environments, countWords, textStats } = require('./structure');
+const { environments, envs, countWords, textStats } = require('./structure');
 const { which, exec } = require('./tools');
 const { ENVIRONMENTS } = require('./data');
 
@@ -40,6 +40,7 @@ function activate(context) {
   reg('texPreview.toggleStar', toggleStar);
   context.subscriptions.push(vscode.commands.registerCommand('texPreview.wordCount', wordCount));
   wordCountStatus(context);
+  menuContext(context);
 
   // Enter on a line starting with \item continues the list. (Enter on an empty \item ends it:
   // see the texPreview.emptyItem context key below.)
@@ -177,7 +178,8 @@ async function toggleDisplayMath(editor) {
   let replacement = null;
   if (raw.startsWith('\\[')) replacement = `\\begin{equation*}${raw.slice(2, -2)}\\end{equation*}`;
   else {
-    const m = raw.match(/^\\begin\{(equation\*?|displaymath)\}([\s\S]*)\\end\{\1\}$/);
+    // Only unnumbered forms: turning a numbered equation into \[ \] would drop its number and label.
+    const m = raw.match(/^\\begin\{(equation\*|displaymath)\}([\s\S]*)\\end\{\1\}$/);
     if (m) replacement = `\\[${m[2]}\\]`;
   }
   if (!replacement) {
@@ -279,6 +281,60 @@ async function endList(editor) {
   const open = openEnvAt(doc, line.range.start);
   const indent = open ? doc.lineAt(doc.positionAt(open.start).line).text.match(/^\s*/)[0] : '';
   await editor.edit((e) => e.replace(line.range, indent));
+}
+
+// ---------------------------------------------------------------------------
+// Context keys, so the right-click menu offers only what applies where you clicked
+
+const STARRABLE = /^(equation|align|gather|multline|alignat|flalign|eqnarray|figure|table|section|subsection|subsubsection|chapter|part|paragraph)\*?$/;
+
+const menuKeys = {}; // the values last set, for tests
+
+function menuContext(context) {
+  const keys = menuKeys;
+  const set = (k, v) => {
+    if (keys[k] === v) return;
+    keys[k] = v;
+    vscode.commands.executeCommand('setContext', `texPreview.${k}`, v);
+  };
+  let timer;
+  const update = () => {
+    const ed = vscode.window.activeTextEditor;
+    if (!ed || !isTex(ed.document)) return;
+    const doc = ed.document;
+    const pos = ed.selection.active;
+    const line = doc.lineAt(pos.line).text;
+    const onHeading = /\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?\s*[[{]/.test(line);
+    const off = doc.offsetAt(pos);
+    const { pairs } = envs(doc);
+    const around = pairs.filter((p) => off >= p.open.start && off <= p.close.end && p.name !== 'document');
+    const inner = around.sort((a, b) => b.open.start - a.open.start)[0];
+    const span = math.mathAt(doc, pos);
+    const raw = span ? doc.getText(span.range) : '';
+    const review = require('./review').contextInfo(ed);
+    set('onHeading', onHeading);
+    set('canStar', onHeading || !!(inner && STARRABLE.test(inner.name)));
+    set('inEnvironment', !!inner);
+    const open = openEnvAt(doc, pos);
+    set('canCloseEnvironment', !!open && open.name !== 'document');
+    set('inDisplayMath', raw.startsWith('\\[') || /^\\begin\{(equation\*|displaymath)\}/.test(raw));
+    set('onChange', review.onChange);
+    set('hasChanges', review.hasChanges);
+    set('structure', keys.onHeading || keys.canStar || keys.inEnvironment || keys.canCloseEnvironment || keys.inDisplayMath);
+  };
+  const later = () => {
+    clearTimeout(timer);
+    timer = setTimeout(update, 120);
+  };
+  context.subscriptions.push(
+    // Immediately on cursor moves: a right-click moves the cursor and opens the menu at once.
+    vscode.window.onDidChangeTextEditorSelection(update),
+    vscode.window.onDidChangeActiveTextEditor(update),
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      if (isTex(e.document)) later();
+    })
+  );
+  later();
 }
 
 // ---------------------------------------------------------------------------
@@ -499,4 +555,4 @@ function lint(context) {
   vscode.workspace.textDocuments.forEach((d) => schedule(d, 500));
 }
 
-module.exports = { activate };
+module.exports = { activate, _menuKeys: () => ({ ...menuKeys }) };
