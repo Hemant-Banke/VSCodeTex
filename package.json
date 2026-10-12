@@ -2,7 +2,7 @@
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview",
   "description": "Overleaf-style LaTeX in VS Code: live side-by-side PDF with SyncTeX, smart suggestions and hover previews, comments and tracked changes, and two-way Overleaf sync.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {
