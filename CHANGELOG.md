@@ -1,7 +1,16 @@
 # Changelog
 
-## 1.1.0
+## 1.2.1
+- README: new introduction with a quick start, features grouped into Preview, Writing and Working together, and an updated overview screenshot.
+- New Marketplace description.
+
+## 1.2.0
 - **Comments and tracked changes**, without changing your LaTeX: comment threads with replies, editing and resolve in VS Code's Comments UI; Track Changes records your edits as suggestions that anyone can accept or reject. Review data lives in `.texreview/` (one file per person, so it never conflicts) and is shared through the Overleaf or Git sync.
+- Right-click menu shows only what applies where you click: Accept/Reject on a tracked change, Add Comment on a selection, heading and environment actions where they make sense.
+- Toggle `\[ \]` and `equation*` no longer converts numbered equations (which would drop their number and label).
+- An empty comment draft shows a single discard button.
+
+## 1.1.0
 - **Suggestions:** `\cite` keys (from `.bib` files or `thebibliography`), `\ref` labels with their printed numbers, commands and your own macros, environments (with the matching `\end`), file paths, packages, `@` Greek/math shortcuts, and `BEQ` / `FIT`-style shortcuts.
 - **Hover previews:** rendered math (with your macros), citation details, referenced equations and captions, figure thumbnails (including PDF figures), package documentation links, and command descriptions.
 - **Outline, breadcrumbs and Go to Symbol** for sections, figures, tables and frames; **folding** of sections, environments, comments and regions; **Expand Selection** through math and environments; linked editing of `\begin`/`\end` names.
