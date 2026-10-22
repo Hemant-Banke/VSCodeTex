@@ -2,7 +2,7 @@
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview",
   "description": "Overleaf-style LaTeX in VS Code: live side-by-side PDF with SyncTeX, smart suggestions and hover previews, comments and tracked changes, and two-way Overleaf sync.",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {
@@ -14,7 +14,7 @@
     "url": "https://github.com/Hemant-Banke/VSCodeTex/issues"
   },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Programming Languages",
@@ -339,10 +339,128 @@
         "title": "Show All Comments",
         "category": "TeX Review",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "texPreview.downloadPdf",
+        "title": "Download PDF…",
+        "category": "TeX",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "texPreview.ai.rewrite",
+        "title": "Rewrite with AI…",
+        "category": "TeX AI",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "texPreview.ai.generate",
+        "title": "Write with AI…",
+        "category": "TeX AI",
+        "icon": "$(wand)"
+      },
+      {
+        "command": "texPreview.ai.fixError",
+        "title": "Fix Compile Error with AI",
+        "category": "TeX AI"
+      },
+      {
+        "command": "texPreview.ai.chooseProvider",
+        "title": "Choose AI Provider…",
+        "category": "TeX AI"
+      },
+      {
+        "command": "texPreview.ai.setApiKey",
+        "title": "Set API Key for OpenAI-compatible Endpoint…",
+        "category": "TeX AI"
+      },
+      {
+        "command": "texPreview.spellcheck.addWord",
+        "title": "Add Word to Dictionary",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.grammar.disableRule",
+        "title": "Disable Grammar Rule",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.grammar.setApiKey",
+        "title": "Set LanguageTool Premium API Key…",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.ai.menu",
+        "title": "AI…",
+        "category": "TeX AI",
+        "icon": {
+          "light": "media/ai-light.svg",
+          "dark": "media/ai-dark.svg"
+        }
+      },
+      {
+        "command": "texPreview.ai.chooseModel",
+        "title": "Change AI Model…",
+        "category": "TeX AI"
+      },
+      {
+        "command": "texPreview.proofing.suggest",
+        "title": "Spelling and Grammar Suggestions",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.spellcheck.toggle",
+        "title": "Spell Check",
+        "category": "TeX",
+        "toggled": "config.texPreview.spellcheck.enabled"
+      },
+      {
+        "command": "texPreview.grammar.toggle",
+        "title": "Grammar Check (LanguageTool)",
+        "category": "TeX",
+        "toggled": "config.texPreview.grammar.enabled"
+      },
+      {
+        "command": "texPreview.spellcheck.chooseLanguage",
+        "title": "Spelling Language…",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.ai.review",
+        "title": "Review with AI…",
+        "category": "TeX AI",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "texPreview.ai.applySuggestion",
+        "title": "Apply Suggestion",
+        "category": "TeX AI",
+        "icon": "$(check)"
+      },
+      {
+        "command": "texPreview.ai.keepComment",
+        "title": "Keep as Comment",
+        "category": "TeX AI",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "texPreview.ai.discardComment",
+        "title": "Discard",
+        "category": "TeX AI",
+        "icon": "$(close)"
+      },
+      {
+        "command": "texPreview.ai.clearReview",
+        "title": "Clear AI Review Comments",
+        "category": "TeX AI"
       }
     ],
     "menus": {
       "editor/title": [
+        {
+          "command": "texPreview.ai.menu",
+          "when": "editorLangId =~ /^(la)?tex$/",
+          "group": "navigation@2"
+        },
         {
           "command": "texPreview.open",
           "when": "resourceExtname == .tex || editorLangId == latex",
@@ -357,6 +475,11 @@
           "command": "texPreview.showSymbols",
           "when": "editorLangId =~ /^(la)?tex$/",
           "group": "navigation@1"
+        },
+        {
+          "command": "texPreview.downloadPdf",
+          "when": "resourceExtname == .tex || editorLangId == latex",
+          "group": "1_tex@2"
         }
       ],
       "editor/title/context": [
@@ -374,6 +497,11 @@
         }
       ],
       "editor/context": [
+        {
+          "command": "texPreview.proofing.suggest",
+          "when": "editorLangId =~ /^(la)?tex$/ && texPreview.hasProofing",
+          "group": "navigation@0"
+        },
         {
           "command": "texPreview.open",
           "when": "resourceExtname == .tex || editorLangId == latex",
@@ -549,9 +677,65 @@
         {
           "command": "texPreview.review.addComment",
           "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.downloadPdf",
+          "when": "resourceExtname == .tex || editorLangId == latex"
+        },
+        {
+          "command": "texPreview.ai.rewrite",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.ai.generate",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.ai.fixError",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.spellcheck.addWord",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.grammar.disableRule",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.ai.menu",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.proofing.suggest",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.ai.review",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.ai.applySuggestion",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.ai.keepComment",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.ai.discardComment",
+          "when": "false"
         }
       ],
       "texPreview.latex": [
+        {
+          "submenu": "texPreview.aiMenu",
+          "group": "0_ai@1"
+        },
+        {
+          "submenu": "texPreview.proofingMenu",
+          "group": "0_ai@2"
+        },
         {
           "submenu": "texPreview.format",
           "group": "1_edit@1"
@@ -594,8 +778,12 @@
           "group": "3_doc@3"
         },
         {
+          "command": "texPreview.downloadPdf",
+          "group": "3_doc@3"
+        },
+        {
           "command": "texPreview.clean",
-          "group": "3_doc@4"
+          "group": "3_doc@5"
         }
       ],
       "texPreview.format": [
@@ -691,6 +879,21 @@
           "command": "texPreview.review.deleteThread",
           "group": "inline@2",
           "when": "commentController == texReview && !commentThreadIsEmpty"
+        },
+        {
+          "command": "texPreview.ai.applySuggestion",
+          "group": "inline@1",
+          "when": "commentController == texAIReview && commentThread == aiSuggestion"
+        },
+        {
+          "command": "texPreview.ai.keepComment",
+          "group": "inline@2",
+          "when": "commentController == texAIReview"
+        },
+        {
+          "command": "texPreview.ai.discardComment",
+          "group": "inline@3",
+          "when": "commentController == texAIReview"
         }
       ],
       "comments/comment/title": [
@@ -760,6 +963,55 @@
           "command": "texPreview.review.previousChange",
           "group": "5_nav@2",
           "when": "texPreview.hasChanges"
+        }
+      ],
+      "texPreview.aiMenu": [
+        {
+          "command": "texPreview.ai.rewrite",
+          "group": "1_write@1"
+        },
+        {
+          "command": "texPreview.ai.generate",
+          "group": "1_write@2"
+        },
+        {
+          "command": "texPreview.ai.review",
+          "group": "1_write@3"
+        },
+        {
+          "command": "texPreview.ai.fixError",
+          "group": "1_write@4"
+        },
+        {
+          "command": "texPreview.ai.chooseModel",
+          "group": "2_setup@2"
+        },
+        {
+          "command": "texPreview.ai.chooseProvider",
+          "group": "2_setup@1"
+        },
+        {
+          "command": "texPreview.ai.clearReview",
+          "group": "3_review@1"
+        }
+      ],
+      "texPreview.proofingMenu": [
+        {
+          "command": "texPreview.spellcheck.toggle",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "texPreview.grammar.toggle",
+          "group": "1_toggle@2"
+        },
+        {
+          "command": "texPreview.spellcheck.chooseLanguage",
+          "group": "2_lang@1"
+        },
+        {
+          "command": "texPreview.proofing.suggest",
+          "group": "3_fix@1",
+          "when": "texPreview.hasProofing"
         }
       ]
     },
@@ -936,6 +1188,24 @@
         "command": "texPreview.endList",
         "key": "enter",
         "when": "editorTextFocus && editorLangId == latex && texPreview.emptyItem && !suggestWidgetVisible && !inSnippetMode"
+      },
+      {
+        "command": "texPreview.ai.generate",
+        "key": "alt+l g",
+        "mac": "ctrl+l g",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.ai.rewrite",
+        "key": "alt+l shift+g",
+        "mac": "ctrl+l shift+g",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.ai.review",
+        "key": "alt+l v",
+        "mac": "ctrl+l v",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
       }
     ],
     "configuration": {
@@ -1029,6 +1299,69 @@
           "default": false,
           "markdownDescription": "Lint `.tex` files with [ChkTeX](https://www.nongnu.org/chktex/) as you type (needs `chktex`, included in TeX Live)."
         },
+        "texPreview.chktexSeverity": {
+          "type": "string",
+          "enum": [
+            "warning",
+            "information",
+            "hint"
+          ],
+          "default": "warning",
+          "enumDescriptions": [
+            "Yellow squiggles; files, outline and scrollbar are coloured yellow.",
+            "Blue squiggles and scrollbar marks; files and outline aren't coloured.",
+            "Faint dots only; hidden from the Problems panel and scrollbar."
+          ],
+          "markdownDescription": "How ChkTeX warnings are shown. ChkTeX errors are always shown as errors."
+        },
+        "texPreview.spellcheck.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Check spelling in `.tex` files as you type, offline. Math, commands, labels, citations, comments and the preamble are skipped, as are author names from the project's `.bib` files."
+        },
+        "texPreview.spellcheck.language": {
+          "type": "string",
+          "default": "en-US",
+          "markdownDescription": "Spelling dictionary: `en-US` or `en-GB` (bundled), a Hunspell name like `de_DE` installed in a standard Hunspell folder, or the path of a `.dic` file. A file can choose its own with `% !TeX spellcheck = en_GB` in its first lines. Grammar checks use the same language."
+        },
+        "texPreview.spellcheck.words": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Words to accept. **Add to dictionary** quick fixes add them here, in user or workspace settings (both lists are used)."
+        },
+        "texPreview.grammar.enabled": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Check grammar and style with [LanguageTool](https://languagetool.org). **The prose of open files is sent to `#texPreview.grammar.server#`** (by default the public LanguageTool API, limited to 20 requests a minute). Run your own server for privacy and no limits, e.g. `docker run -p 8010:8010 erikvl87/languagetool` and set the server to `http://localhost:8010`."
+        },
+        "texPreview.grammar.server": {
+          "type": "string",
+          "default": "https://api.languagetool.org",
+          "markdownDescription": "LanguageTool server. With a Premium `#texPreview.grammar.username#` and API key (**TeX: Set LanguageTool Premium API Key…**), the public server switches to the Premium one."
+        },
+        "texPreview.grammar.username": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "LanguageTool Premium username (email), used with the API key."
+        },
+        "texPreview.grammar.disabledRules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "WHITESPACE_RULE",
+            "UPPERCASE_SENTENCE_START",
+            "EN_QUOTES",
+            "DASH_RULE",
+            "COMMA_PARENTHESIS_WHITESPACE",
+            "PUNCTUATION_PARAGRAPH_END"
+          ],
+          "markdownDescription": "LanguageTool rule IDs to ignore. The defaults are rules that misfire on LaTeX (spacing and quotes from markup, lowercase list items). **Disable grammar rule** quick fixes add to this list."
+        },
         "texPreview.externalViewer.command": {
           "type": "string",
           "default": "",
@@ -1043,6 +1376,40 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Your name on comments and tracked changes. Empty uses Git's `user.name`."
+        },
+        "texPreview.ai.provider": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "copilot",
+            "claude",
+            "codex",
+            "openai"
+          ],
+          "default": "ask",
+          "enumDescriptions": [
+            "Ask on first use.",
+            "GitHub Copilot, or another extension's model, through VS Code's Language Model API.",
+            "The Claude Code CLI (`claude`), using your Claude subscription.",
+            "The Codex CLI (`codex`), using your ChatGPT plan.",
+            "Any OpenAI-compatible endpoint: Ollama, LM Studio, OpenRouter, Groq, vLLM, OpenAI…"
+          ],
+          "markdownDescription": "Where **Rewrite with AI**, **Write with AI** and **Fix with AI** send their requests: the passage, nearby text and the preamble's package and macro lines. **TeX AI: Choose AI Provider…** sets this up."
+        },
+        "texPreview.ai.model": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Model to use. Copilot: a model id or family (empty lets Copilot choose). Claude / Codex: passed as `--model` / `-m` (empty uses the CLI's default). OpenAI-compatible: required, e.g. `llama3.1`; you're asked on first use."
+        },
+        "texPreview.ai.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434/v1",
+          "markdownDescription": "Base URL of the OpenAI-compatible endpoint (the part before `/chat/completions`). The API key, if needed, is kept in VS Code's secret storage: **TeX AI: Set API Key…**."
+        },
+        "texPreview.ai.trackChanges": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Add AI edits as tracked changes you can accept or reject, even when Track Changes is off. Off: AI edits are plain edits (undo with Ctrl/Cmd+Z)."
         }
       }
     },
@@ -1062,6 +1429,14 @@
       {
         "id": "texPreview.reviewMenu",
         "label": "Review"
+      },
+      {
+        "id": "texPreview.aiMenu",
+        "label": "AI"
+      },
+      {
+        "id": "texPreview.proofingMenu",
+        "label": "Spelling and Grammar"
       }
     ],
     "viewsContainers": {
@@ -1085,12 +1460,15 @@
     }
   },
   "scripts": {
-    "package": "vsce package --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/main/",
-    "publish": "vsce publish --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/main/",
-    "publish:ovsx": "npm run package && ovsx publish *.vsix"
+    "package": "vsce package --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/v$npm_package_version/",
+    "publish": "vsce publish --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/v$npm_package_version/",
+    "publish:ovsx": "npm run package && ovsx publish tex-side-preview-$npm_package_version.vsix"
   },
   "dependencies": {
+    "dictionary-en": "4.0.0",
+    "dictionary-en-gb": "3.0.0",
     "mathjax": "3.2.2",
+    "nspell": "2.1.5",
     "pdfjs-dist": "3.11.174"
   },
   "icon": "media/logo.png",

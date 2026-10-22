@@ -255,6 +255,7 @@ class DocState {
     this.rel = this.store.rel(doc.uri.fsPath);
     this.text = doc.getText();
     this.suppress = 0;
+    this.pending = null; // a suggestion being applied: {a, len, ins}
     this.touched = new Set(); // change ids to write on the next flush
     this.removed = new Set();
     this.resolve();
@@ -430,9 +431,16 @@ function onChange(e) {
     reloadSoon();
     return;
   }
-  const tracked = tracking() && !st.suppress;
-  for (const ch of [...e.contentChanges].sort((x, y) => y.rangeOffset - x.rangeOffset)) {
-    st.apply(ch.rangeOffset, ch.rangeLength, ch.text, tracked);
+  if (st.pending && !st.suppress) {
+    // Record the suggestion as one replacement; VS Code reports it as a minimal diff.
+    const p = st.pending;
+    st.pending = null;
+    st.apply(p.a, p.len, p.ins, true);
+  } else {
+    const tracked = tracking() && !st.suppress;
+    for (const ch of [...e.contentChanges].sort((x, y) => y.rangeOffset - x.rangeOffset)) {
+      st.apply(ch.rangeOffset, ch.rangeLength, ch.text, tracked);
+    }
   }
   if (st.text !== e.document.getText()) {
     st.text = e.document.getText(); // out of step (should not happen): re-place from scratch
@@ -479,6 +487,22 @@ async function reject(ids, st) {
   st.store.append(list.map((c) => ({ type: 'change', id: c.id, file: st.rel, removed: true, why: 'rejected' })));
   await st.doc.save();
   decorate();
+}
+
+/** Replaces `range` of `doc` with `text` as a tracked change, even with tracking off. Untracked for files review can't follow. */
+async function suggest(doc, range, text) {
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(doc.uri, range, text);
+  const st = stateFor(doc);
+  if (!st) return vscode.workspace.applyEdit(edit);
+  if (!me) await identity(path.dirname(doc.uri.fsPath));
+  const a = doc.offsetAt(range.start);
+  st.pending = { a, len: doc.offsetAt(range.end) - a, ins: text };
+  try {
+    return await vscode.workspace.applyEdit(edit);
+  } finally {
+    st.pending = null;
+  }
 }
 
 function activeState() {
@@ -766,6 +790,18 @@ async function createComment(reply) {
   decorate();
 }
 
+/** Adds a comment thread on `range` of `doc` as this person, shared like any other comment. */
+async function addComment(doc, range, body) {
+  if (!isTex(doc)) return false;
+  await identity(path.dirname(doc.uri.fsPath));
+  const store = storeFor(doc.uri);
+  const anchor = makeAnchor(doc.getText(), doc.offsetAt(range.start), doc.offsetAt(range.end));
+  store.append([{ type: 'comment', id: newId(), cid: newId(), file: store.rel(doc.uri.fsPath), anchor, author: me.name, body }]);
+  syncThreads();
+  decorate();
+  return true;
+}
+
 async function replyComment(reply) {
   const vt = reply.thread;
   if (!vt.reviewId) return createComment(reply);
@@ -967,4 +1003,4 @@ async function activate(ctx, opts = {}) {
   decorate();
 }
 
-module.exports = { activate, contextInfo, locate, makeAnchor, DocState, flushAll, _state: () => ({ docs, stores, vsThreads, me: () => me, setMe: (m) => (me = m) }) };
+module.exports = { activate, suggest, addComment, contextInfo, locate, makeAnchor, DocState, flushAll, _state: () => ({ docs, stores, vsThreads, me: () => me, setMe: (m) => (me = m) }) };

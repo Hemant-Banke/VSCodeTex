@@ -31,6 +31,16 @@ const md = (s) => {
   return m;
 };
 
+/**
+ * A hover with a "Copy LaTeX" link under `markdown`. A rendered equation is only an image, and
+ * VS Code's own hover copy button copies visible text, so it can't copy the source.
+ */
+function withCopy(markdown, tex) {
+  const m = md(`${markdown}\n\n[$(copy) Copy LaTeX](command:texPreview.copyText?${encodeURIComponent(JSON.stringify([tex.trim()]))} "Copy the LaTeX source")`);
+  m.isTrusted = { enabledCommands: ['texPreview.copyText'] };
+  return m;
+}
+
 function fsPathOf(doc) {
   return doc.uri.scheme === 'file' ? doc.uri.fsPath : null;
 }
@@ -337,7 +347,7 @@ class HoverProvider {
       const r = await math.render(inMath.tex, inMath.display, file ? macroPreamble(file) : '');
       const fallback = r.error && file ? await math.render(inMath.tex, inMath.display) : null;
       const out = fallback && !fallback.error ? fallback : r;
-      return new vscode.Hover(md(out.markdown || `$(warning) ${escapeMd(out.error)}`), inMath.range);
+      return new vscode.Hover(withCopy(out.markdown || `$(warning) ${escapeMd(out.error)}`, doc.getText(inMath.range)), inMath.range);
     }
     return this.command(doc, pos, file);
   }
@@ -360,7 +370,7 @@ class HoverProvider {
     if (arg.cmd === 'label' && !ctx.mathTex) return null;
     if (ctx.mathTex) {
       const r = await math.render(ctx.mathTex, true, macroPreamble(file));
-      if (r.markdown) return new vscode.Hover(md(head + '\n\n' + r.markdown), arg.range);
+      if (r.markdown) return new vscode.Hover(withCopy(head + '\n\n' + r.markdown, ctx.mathTex), arg.range);
     }
     return new vscode.Hover(md(head + (ctx.code ? '\n\n```latex\n' + ctx.code + '\n```' : '')), arg.range);
   }
@@ -380,7 +390,8 @@ class HoverProvider {
       if (target) break;
     }
     if (!target) return new vscode.Hover(md(`$(warning) Image \`${escapeMd(arg.item)}\` not found`), arg.range);
-    const link = `[${path.basename(target)}](${vscode.Uri.file(target)})`;
+    const shown = path.relative(rootDir, target);
+    const link = `[${escapeMd(shown.startsWith('..') ? target : shown)}](${vscode.Uri.file(target)})`;
     const img = await imageDataUri(target);
     return new vscode.Hover(md(img ? `![${path.basename(target)}](${img}|width=360)\n\n${link}` : link), arg.range);
   }

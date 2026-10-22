@@ -17,6 +17,7 @@
   const ZOOMS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
   let pdfDoc = null;
+  let pdfBytes = null; // the current PDF, for downloads
   let pageSizes = []; // unscaled [w, h] at scale 1
   let pageEls = [];
   let observer = null;
@@ -92,6 +93,7 @@
   async function loadPdf(base64) {
     await workerReady;
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    pdfBytes = bytes.slice(); // pdf.js takes ownership of the buffer it's given
     const doc = await pdfjsLib.getDocument({
       data: bytes,
       isEvalSupported: false,
@@ -419,6 +421,16 @@
     if (e.key === 'Escape') sectionsMenu.hidden = true;
   });
   document.getElementById('open-browser').addEventListener('click', () => vscode.postMessage({ type: 'openBrowser' }));
+  // In a browser, a normal download; in VS Code, the extension asks where to save.
+  document.getElementById('download').addEventListener('click', () => {
+    if (!document.body.classList.contains('browser')) return vscode.postMessage({ type: 'download' });
+    if (!pdfBytes) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+    a.download = window.PDF_NAME || 'document.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  });
 
   // Dark PDF: the setting decides, the toolbar button overrides it for this preview.
   function setInvert(on) {

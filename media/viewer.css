@@ -44,6 +44,12 @@ body {
   background: var(--vscode-button-background) !important;
 }
 #recompile:hover { background: var(--vscode-button-hoverBackground) !important; }
+#download {
+  color: var(--vscode-button-foreground) !important;
+  background: var(--vscode-button-background) !important;
+  font-weight: 600;
+}
+#download:hover { background: var(--vscode-button-hoverBackground) !important; }
 #pages { opacity: .7; margin-right: 4px; }
 #zoom-label { min-width: 48px !important; }
 

@@ -14,6 +14,9 @@ const structure = require('./structure');
 const editing = require('./editing');
 const palette = require('./palette');
 const review = require('./review');
+const proofing = require('./proofing');
+const ai = require('./ai');
+const aiReview = require('./aireview');
 const { BrowserServer } = require('./server');
 
 /** @type {Map<string, Preview>} keyed by root .tex fsPath */
@@ -54,6 +57,15 @@ function activate(context) {
       return p ? openInBrowser(p, opts.launch !== false) : undefined;
     }),
     vscode.commands.registerCommand('texPreview.menu', () => showMenu()),
+    vscode.commands.registerCommand('texPreview.copyText', async (text) => {
+      if (typeof text !== 'string') return;
+      await vscode.env.clipboard.writeText(text);
+      vscode.window.setStatusBarMessage('$(copy) Copied LaTeX', 2000);
+    }),
+    vscode.commands.registerCommand('texPreview.downloadPdf', () => {
+      const ed = vscode.window.activeTextEditor;
+      return downloadPdf((ed && ed.document.uri.scheme === 'file' && previewFor(ed.document.uri)) || activePreview());
+    }),
     // Keep the TeX status item visible for LaTeX files so its menu is always one click away.
     vscode.window.onDidChangeActiveTextEditor((ed) => {
       const tex = ed && /^(la)?tex$/.test(ed.document.languageId);
@@ -78,6 +90,9 @@ function activate(context) {
   );
   editing.activate(context);
   palette.activate(context);
+  proofing.activate(context);
+  ai.activate(context);
+  aiReview.activate(context);
   // Review logs are written outside any editor, so tell the Overleaf sync about them directly.
   review.activate(context, { onLogWritten: (uris) => overleaf.scheduleFor(uris) }).catch((e) => output.appendLine(`[review] ${e.stack || e}`));
   const ed = vscode.window.activeTextEditor;
@@ -158,6 +173,25 @@ async function openExternal() {
 }
 
 /** Opens the live preview in the default web browser; it stays in sync with VS Code. */
+/** Saves a copy of the compiled PDF where the person picks (Downloads by default). */
+async function downloadPdf(preview) {
+  if (!preview) return;
+  if (!fs.existsSync(preview.pdfPath)) await preview.compile();
+  if (!fs.existsSync(preview.pdfPath)) return vscode.window.showWarningMessage('TeX Preview: there is no PDF yet; fix the compile errors first.');
+  const downloads = path.join(os.homedir(), 'Downloads');
+  const dir = fs.existsSync(downloads) ? downloads : preview.rootDir;
+  const target = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(path.join(dir, preview.base + '.pdf')), filters: { PDF: ['pdf'] }, title: 'Download PDF' });
+  if (!target) return;
+  try {
+    await fs.promises.copyFile(preview.pdfPath, target.fsPath);
+  } catch (e) {
+    return vscode.window.showErrorMessage(`TeX Preview: couldn't save the PDF (${e.message}).`);
+  }
+  const choice = await vscode.window.showInformationMessage(`Saved ${path.basename(target.fsPath)}`, 'Open', process.platform === 'darwin' ? 'Reveal in Finder' : 'Show in Folder');
+  if (choice === 'Open') vscode.env.openExternal(target);
+  else if (choice) vscode.commands.executeCommand('revealFileInOS', target);
+}
+
 async function openInBrowser(preview, launch = true) {
   preview.external = true;
   const url = await browserServer.url(preview);
@@ -169,13 +203,23 @@ async function openInBrowser(preview, launch = true) {
 /** The TeX status bar item's menu: everything you can do with the build and the PDF. */
 async function showMenu() {
   const p = activePreview();
+  const cfg = vscode.workspace.getConfiguration('texPreview');
   const items = [
     { label: '$(refresh) Recompile', command: 'texPreview.compile' },
     { label: '$(debug-stop) Stop Compiling', command: 'texPreview.stop', hide: !p || (!p.proc && !p.running) },
     { label: '$(open-preview) Open Preview to the Side', command: 'texPreview.open' },
     { label: '$(globe) Open Preview in Browser', description: 'live reload and SyncTeX', command: 'texPreview.openInBrowser' },
     { label: '$(file-pdf) Open PDF in External Viewer', command: 'texPreview.openExternal' },
+    { label: '$(cloud-download) Download PDF…', command: 'texPreview.downloadPdf' },
     { label: '$(go-to-file) Jump to Location in PDF', command: 'texPreview.syncToPdf' },
+    { label: '', kind: vscode.QuickPickItemKind.Separator },
+    { label: '$(wand) Write with AI…', command: 'texPreview.ai.generate' },
+    { label: '$(sparkle) Rewrite with AI…', command: 'texPreview.ai.rewrite' },
+    { label: '$(comment-discussion) Review with AI…', command: 'texPreview.ai.review' },
+    { label: '$(settings-gear) AI Provider and Model…', command: 'texPreview.ai.menu' },
+    { label: '', kind: vscode.QuickPickItemKind.Separator },
+    { label: `$(${cfg.get('spellcheck.enabled') ? 'pass-filled' : 'circle-large-outline'}) Spell Check`, description: cfg.get('spellcheck.enabled') ? 'on' : 'off', command: 'texPreview.spellcheck.toggle' },
+    { label: `$(${cfg.get('grammar.enabled') ? 'pass-filled' : 'circle-large-outline'}) Grammar Check`, description: cfg.get('grammar.enabled') ? 'on' : 'off', command: 'texPreview.grammar.toggle' },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     { label: '$(book) Word Count', command: 'texPreview.wordCount' },
     { label: '$(symbol-operator) Show Symbol Palette', command: 'texPreview.showSymbols' },
@@ -572,6 +616,9 @@ class Preview {
       case 'showLog':
         output.show(true);
         break;
+      case 'download':
+        downloadPdf(this);
+        break;
     }
   }
 
@@ -829,13 +876,15 @@ ${a.csp ? `<meta http-equiv="Content-Security-Policy" content="${a.csp}">` : ''}
     <button id="zoom-in" title="Zoom in">+</button>
     <button id="invert" title="Dark PDF (texPreview.invertPdf)">◐</button>
     <button id="open-browser" title="Open in browser (live, with SyncTeX)">↗</button>
+    <button id="download" title="Download PDF">⤓ PDF</button>
   </header>
   <section id="errors" hidden></section>
   <main id="viewer"><div id="empty">The PDF will appear here after the first compile.</div></main>
   ${a.shim ? `<script>${a.shim}</script>` : ''}
   <script${n} src="${a.pdfjs('pdf.min.js')}"></script>
   <script${n}>window.PDF_WORKER_URL = ${worker};
-    window.PDF_ASSETS = ${assets};</script>
+    window.PDF_ASSETS = ${assets};
+    window.PDF_NAME = ${JSON.stringify(this.base + '.pdf')};</script>
   <script${n} src="${a.media('viewer.js')}"></script>
 </body>
 </html>`;

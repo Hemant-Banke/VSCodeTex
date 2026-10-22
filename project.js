@@ -338,4 +338,4 @@ function forget(file) {
   fileCache.delete(file);
 }
 
-module.exports = { read, stripComments, group, parseBib, cleanBibValue, findRoot, projectFiles, resolveTex, project, info, bibLine, forget, lineStarts, lineOf };
+module.exports = { read, stripComments, group, parseBib, cleanBibValue, ACCENTS, findRoot, projectFiles, resolveTex, project, info, bibLine, forget, lineStarts, lineOf };

@@ -6,7 +6,7 @@ Write on the left and the PDF updates on the right every time you save. Click be
 
 It feels like part of VS Code rather than something bolted on. Everything works through VS Code's own features: suggestions, hovers, the Outline, comment threads, Format Document, the Problems panel and the status bar. Your LaTeX stays plain LaTeX, with no review markup or extra packages added.
 
-![The numbered Outline, tracked changes and a comment thread in the editor, the live PDF preview, and the word count and Review items in the status bar](docs/images/feature-overview.png)
+![The numbered Outline, an AI rewrite shown as a tracked change and a comment thread in the editor, the live PDF preview with its Download PDF button, and the word count and Review items in the status bar](docs/images/feature-overview.png)
 
 ### Quick start
 
@@ -53,6 +53,7 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 | 🖥️ **Side-by-side preview** | The PDF opens next to your source and refreshes when you save, keeping your place. |
 | 🧭 **SyncTeX, both directions** | Double-click the PDF to jump to the source, or press ⌥⌘J to jump from the source into the PDF. |
 | 🔗 **A real PDF viewer** | Working links, text selection and copy, zoom, a Sections menu, and dark pages (◐). |
+| ⬇️ **Download PDF** | **⤓ PDF** in the preview's toolbar saves a copy of the compiled PDF (Downloads by default), in VS Code or the browser preview. |
 | 🌐 **Browser and external viewers** | The same live preview in a browser tab, or the PDF in your own viewer. |
 | 🚨 **Clickable errors** | Listed above the PDF and in the Problems panel; the last good PDF stays visible. |
 
@@ -65,6 +66,8 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 | 🔣 **Symbol palette** | Click to insert Greek letters, relations, arrows, accents, matrices, figures and tables. |
 | ✍️ **Editing keys** | Bold, italic, inline math, surround with a command or environment, promote/demote headings, `\item` lists. |
 | 🗂️ **Outline** | Headings numbered as in the PDF, plus figures, tables and theorems; folding and Expand Selection. |
+| 🔤 **Spelling and grammar** | Offline spell check that skips math, commands and citations; optional grammar checks with LanguageTool. |
+| ✨ **AI writing help** | Rewrite a passage, write LaTeX at the cursor, get review comments with suggested changes, or fix a compile error, with Copilot, your Claude or ChatGPT subscription, or any open model. Results arrive as tracked changes. |
 | 🧹 **Format, lint and count** | Format Document for `.tex` and `.bib`, duplicate-label warnings, optional ChkTeX, and a word count in the status bar. |
 
 **Working together**
@@ -340,6 +343,76 @@ All of these work with several cursors. They use ⌃L on macOS and Alt+L on Wind
 - **Duplicate labels** are flagged in the Problems panel as you type, across all the project's files.
 - **ChkTeX:** set `texPreview.chktex` to `true` to lint as you type (ChkTeX comes with TeX Live).
 
+### Spelling and grammar
+
+**Spelling** is checked as you type, offline, with a Hunspell dictionary. Only the prose is checked: math, commands, `\label`/`\ref`/`\cite` arguments, comments and the preamble are skipped, accents such as `na\"ive` or `Erd\H{o}s` are read as *naïve* and *Erdős*, and author names from the project's `.bib` files are accepted. Unknown words get a blue squiggle. **Right-click → Spelling and Grammar Suggestions** (or ⌘. / Ctrl+.) opens the corrections at the word, with **Add to user/workspace dictionary**.
+
+<img src="docs/images/spell-suggestions.png" alt="Spelling and Grammar Suggestions on a misspelt word: Change to &quot;temperature&quot; and Add to dictionary" width="49%"> <img src="docs/images/grammar-hover.png" alt="A LanguageTool grammar issue: Did you mean &quot;faster than&quot;?" width="49%">
+
+**On and off:** right-click → **LaTeX → Spelling and Grammar** has *Spell Check* and *Grammar Check* switches (with a checkmark when on) and *Spelling Language…*; the same switches are in the **TeX** status bar menu.
+
+- **Language:** `texPreview.spellcheck.language` is `en-US` or `en-GB` (both bundled), the name of a Hunspell dictionary installed on your machine (`de_DE`, `fr_FR`, … from `~/Library/Spelling`, `/usr/share/hunspell` and similar), or the path of a `.dic` file. A file can pick its own with `% !TeX spellcheck = en_GB` in its first lines.
+- **Off:** set `texPreview.spellcheck.enabled` to `false`, for example if you use another spell-check extension.
+
+**Grammar** is off by default. Set `texPreview.grammar.enabled` to `true` to check grammar and style with [LanguageTool](https://languagetool.org): the same prose is sent to the server, results appear as blue squiggles with suggested fixes, and **Disable grammar rule** silences a rule you don't want. Only paragraphs that changed are re-checked, and only files on screen.
+
+- **Privacy:** by default the text goes to LanguageTool's public API (free, about 20 checks a minute). To keep it on your machine, run a local server, e.g. `docker run -p 8010:8010 erikvl87/languagetool`, and set `texPreview.grammar.server` to `http://localhost:8010`.
+- **Premium:** set `texPreview.grammar.username` and run **TeX: Set LanguageTool Premium API Key…**.
+
+### AI writing help
+
+<img src="docs/images/ai-title-button.png" alt="The gold AI button in the editor title bar" width="420">
+
+Click **✨** in the editor's title bar for the AI menu, or use the **LaTeX → AI** right-click submenu, the **TeX** status bar menu or the Command Palette (**TeX AI:**).
+
+**To write from a prompt**, put the cursor where the text should go and press **⌃L G** (Alt+L G), or ✨ → **Write with AI…**, then describe what you want, e.g. *"a paragraph motivating the model in Section 2"* or *"a booktabs table of the three facility types with rate, tenure and prepayment rules"*. The text before and after the cursor is sent along so the result fits in.
+
+<img src="docs/images/ai-menu.png" alt="The AI menu: Write, Rewrite, Fix Compile Error, Choose AI Provider and Change AI Model" width="49%"> <img src="docs/images/ai-write.png" alt="A sentence written by AI, shown as a tracked insertion with Accept and Reject" width="49%">
+
+- **Rewrite with AI…** (⌃L ⇧G / Alt+L Shift+G) rewrites the selection, or the paragraph at the cursor: *Improve writing*, *Fix grammar and spelling*, *Make concise*, *Make more formal*, *Simplify*, *Expand*, *Fix LaTeX*, or your own instruction.
+- **Write with AI…** writes LaTeX at the cursor from a description: a table, a figure, a TikZ diagram, an equation, a paragraph. If it needs a package the preamble doesn't load, you're offered to add it.
+- **Review with AI…** (⌃L V / Alt+L V) reads the selection, the section at the cursor or the whole file and leaves comments on what it would change, like a co-author or GitHub Copilot's review comments. See [Review comments](#review-comments-from-ai) below.
+- **Fix with AI** appears in the lightbulb on compile errors. The model sees the error and the lines around it, proposes the smallest fix and says why.
+
+<img src="docs/images/ai-rewrite.png" alt="Rewrite with AI changed &quot;classic&quot; to &quot;most familiar&quot;: the old word is struck through, the new one highlighted, with Accept and Reject" width="560">
+
+The model is given the passage, some text before and after it, and the preamble's `\usepackage` and `\newcommand` lines, and is told to keep your labels, citations and math and never to invent citations or results. **Results are added as tracked changes** (green and struck-through red, with Accept/Reject), even when Track Changes is off; set `texPreview.ai.trackChanges` to `false` for plain edits.
+
+#### Review comments from AI
+
+**Review with AI…** asks what to review (the selection, the section at the cursor or the whole file) and what to look for: *everything*, *language and style*, *mathematics and notation*, *structure and argument*, *LaTeX*, or your own focus. Each comment is attached to the words it's about, explains the problem, and usually suggests a replacement. The first one opens; the rest are in the gutter and the **Comments** panel under *AI Review*.
+
+<img src="docs/images/ai-review.png" alt="An AI review comment on &quot;The temprature&quot;: Typo, with the suggested change &quot;The temperature&quot; and Apply, Keep as Comment and Discard buttons" width="560">
+
+Each comment's title bar has three buttons:
+
+- **✓ Apply** makes the suggested change as a tracked change (accept or reject it as usual) and opens the next comment.
+- **Keep as Comment** turns it into an ordinary comment thread, in your name, that collaborators see after the next sync.
+- **✕ Discard** drops it and opens the next one.
+
+AI review comments stay on your machine: they're not written to `.texreview` and disappear when VS Code restarts, unless you keep them. A new review of a file replaces the previous one; **TeX AI: Clear AI Review Comments** removes them all.
+
+**Your own shortcut for a prompt you use often:** both commands take their instruction as an argument, e.g. in `keybindings.json`:
+
+```json
+[
+  { "key": "ctrl+l q", "command": "texPreview.ai.rewrite", "args": "Make this more concise.", "when": "editorLangId == latex" },
+  { "key": "ctrl+l h", "command": "texPreview.ai.generate", "args": "a booktabs table summarising this section", "when": "editorLangId == latex" },
+  { "key": "ctrl+l y", "command": "texPreview.ai.review", "args": { "scope": "section", "focus": "Check the notation is consistent." }, "when": "editorLangId == latex" }
+]
+```
+
+**Choosing a provider and model.** ✨ → **Choose AI Provider…** (you're also asked on first use) and ✨ → **Change AI Model…**, which lists the provider's models: Copilot's models, *Sonnet / Opus / Haiku* for Claude, or what your endpoint serves. **Other…** takes any model name.
+
+**Adding your own model:** choose **OpenAI-compatible API**, pick a preset (Ollama, LM Studio, OpenRouter, Groq, OpenAI) or **Other…** and enter the server's URL (the part before `/chat/completions`), then pick or type the model. A key, if the server needs one, goes in VS Code's secret storage (✨ → **Set API Key…**).
+
+| Provider | What you need |
+|---|---|
+| **GitHub Copilot** | The GitHub Copilot Chat extension, signed in. Pick a model, or let Copilot choose. Other extensions that provide VS Code language models work too. |
+| **Claude** (your Claude Pro/Max subscription) | [Claude Code](https://claude.com/claude-code) installed and signed in (run `claude` once). Requests run `claude -p` with no tools. |
+| **ChatGPT** (your ChatGPT plan) | The [Codex CLI](https://github.com/openai/codex) installed and signed in (`codex login`). Requests run `codex exec` in a read-only sandbox. |
+| **OpenAI-compatible API** | Any server with `/chat/completions`: Ollama and LM Studio (local, nothing leaves your machine), OpenRouter, Groq, vLLM, OpenAI. Pick the endpoint and model; an API key, if needed, is kept in VS Code's secret storage. |
+
 ---
 
 ## Viewing the PDF
@@ -354,8 +427,9 @@ In the preview toolbar:
 - **☰ Sections** lists the numbered headings; pick one to scroll there.
 - **◐** shows the PDF with dark pages. `texPreview.invertPdf` sets the default.
 - **−**, **Fit** and **+** zoom.
+- **⤓ PDF** downloads the PDF: in VS Code it asks where to save a copy (Downloads by default), in a browser it's a normal download. Also **TeX: Download PDF…**.
 
-The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompile, Stop, Open Preview, Open in Browser, Open in External Viewer, Jump to Location, Word Count, Insert Symbol, Clean, Show Log.
+The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompile, Stop, Open Preview, Open in Browser, Open in External Viewer, Download PDF, Jump to Location, Rewrite/Write with AI, Choose AI Provider, Word Count, Insert Symbol, Clean, Show Log.
 
 ![The live preview in a web browser, with the Sections menu open](docs/images/browser-preview.png)
 
@@ -415,6 +489,7 @@ Press **⌃L R** (Alt+L R), or click **Review** in the status bar and choose **T
 - **Inserted text** is highlighted in green.
 - **Deleted text** stays visible, struck through in red. The file itself no longer contains it, so the PDF shows the proposed version.
 - **Replacing a word** shows the new word highlighted with the old one struck through beside it.
+- **AI edits** ([Rewrite, Write and Fix with AI](#ai-writing-help), and applied [AI review suggestions](#review-comments-from-ai)) arrive the same way, as your suggestions, even when Track Changes is off, so you review them before they're kept.
 - Typing a word letter by letter makes one suggestion, and backspacing over your own suggestion just shortens it.
 
 Hover a suggestion to see who made it and when, with **Accept** and **Reject** links. **Accept** keeps the text; **Reject** puts the original back.
@@ -518,6 +593,7 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX: Jump to Location in PDF** | ⌥⌘J | Ctrl+Alt+J | Editor right-click menu |
 | **TeX: Open Preview in Browser** | | | ↗ in the preview; title-bar `···` menu; LaTeX right-click submenu |
 | **TeX: Open PDF in External Viewer** | | | LaTeX right-click submenu |
+| **TeX: Download PDF…** | | | ⤓ in the preview; title-bar `···` menu; LaTeX right-click submenu |
 | **TeX: Stop Compiling** | | | TeX status bar menu |
 | **TeX: Clean Auxiliary Files** | | | LaTeX right-click submenu |
 | **TeX: Show Compile Log** | | | TeX status bar menu |
@@ -548,6 +624,20 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX Review: Review…** (also **Review** in the status bar) | | |
 | End list (Enter on an empty `\item`) | ↵ | Enter |
 
+**AI**
+
+| Command | Where |
+|---|---|
+| **TeX AI: AI…** | ✨ in the editor title bar |
+| **TeX AI: Write with AI…** (⌃L G / Alt+L G) | ✨ menu; LaTeX → AI right-click submenu; TeX status bar menu |
+| **TeX AI: Rewrite with AI…** (⌃L ⇧G / Alt+L Shift+G) | ✨ menu; LaTeX → AI right-click submenu; TeX status bar menu |
+| **TeX AI: Review with AI…** (⌃L V / Alt+L V) | ✨ menu; LaTeX → AI right-click submenu; TeX status bar menu |
+| **TeX AI: Clear AI Review Comments** | LaTeX → AI submenu |
+| **TeX AI: Change AI Model…** | ✨ menu; LaTeX → AI submenu |
+| **TeX AI: Fix Compile Error with AI** | Lightbulb on a compile error; LaTeX → AI submenu |
+| **TeX AI: Choose AI Provider…** | LaTeX → AI submenu; TeX status bar menu |
+| **TeX AI: Set API Key for OpenAI-compatible Endpoint…** | Command Palette |
+
 **VS Code's own keys, powered by the extension**
 
 | Action | macOS | Windows / Linux |
@@ -568,6 +658,8 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **Overleaf: Sync Actions…** | Click **Overleaf** in the status bar |
 | **Overleaf: Set Git Token…** | Overleaf status bar menu |
 
+**Hovering over math** shows the rendered equation with a **Copy LaTeX** link. (VS Code's own copy icon on hovers copies visible text only, so it can't copy an equation image.)
+
 **In the PDF** (panel or browser): **double-click** jumps to the source, **⌘C** copies the selection, **⌘/Ctrl + mouse wheel** zooms, and **☰ Sections** jumps to a heading.
 
 ---
@@ -585,6 +677,18 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | `texPreview.docker.image` | `""` | Run the compiler inside this Docker image. |
 | `texPreview.invertPdf` | `never` | `never`, `darkTheme` or `always`: show the PDF with dark pages. |
 | `texPreview.chktex` | `false` | Lint `.tex` files with ChkTeX as you type. |
+| `texPreview.chktexSeverity` | `warning` | Show ChkTeX warnings as `warning`, `information` or `hint`. |
+| `texPreview.spellcheck.enabled` | `true` | Check spelling as you type, offline. |
+| `texPreview.spellcheck.language` | `en-US` | `en-US`, `en-GB`, an installed Hunspell dictionary name (`de_DE`) or a `.dic` path. Also used for grammar. |
+| `texPreview.spellcheck.words` | `[]` | Words to accept (user and workspace lists are combined). |
+| `texPreview.grammar.enabled` | `false` | Check grammar with LanguageTool. Sends the prose of open files to the server. |
+| `texPreview.grammar.server` | `https://api.languagetool.org` | LanguageTool server, e.g. `http://localhost:8010` for a local one. |
+| `texPreview.grammar.username` | `""` | LanguageTool Premium username, used with the API key. |
+| `texPreview.grammar.disabledRules` | *(rules that misfire on LaTeX)* | LanguageTool rule IDs to ignore. |
+| `texPreview.ai.provider` | `ask` | `copilot`, `claude`, `codex` or `openai` (OpenAI-compatible). `ask` asks on first use. |
+| `texPreview.ai.model` | `""` | Model id or family; required for `openai`, optional otherwise. |
+| `texPreview.ai.baseUrl` | `http://localhost:11434/v1` | OpenAI-compatible endpoint (Ollama by default). |
+| `texPreview.ai.trackChanges` | `true` | Add AI edits as tracked changes. |
 | `texPreview.externalViewer.command` | `""` | Command that opens the PDF externally (`%PDF%`). Empty uses the system default. |
 | `texPreview.externalViewer.syncCommand` | `""` | Forward search in the external viewer (`%PDF%`, `%TEX%`, `%LINE%`). |
 | `texPreview.review.author` | `""` | Your name on comments and tracked changes. Empty uses Git's `user.name`. |

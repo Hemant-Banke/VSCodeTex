@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.0
+- The Marketplace page now shows the current screenshots (image links are tied to each release).
+- **Spell check**, offline, as you type (bundled en-US and en-GB Hunspell dictionaries, or any installed one). Only prose is checked: math, commands, citations, comments and the preamble are skipped, accents are understood and `.bib` author names are accepted. Quick fixes suggest corrections and add words to a user or workspace dictionary.
+- **Grammar check** with LanguageTool (opt-in): public API, a local server or Premium. Only changed paragraphs of visible files are sent; rules can be disabled from the quick fix.
+- **AI writing help**: *Rewrite with AI* (presets or your own instruction), *Write with AI* at the cursor (offers to add missing packages) and *Fix with AI* on compile errors. Providers: GitHub Copilot (VS Code language models), the Claude Code and Codex CLIs (your Claude or ChatGPT subscription) and any OpenAI-compatible endpoint (Ollama, LM Studio, OpenRouter…). Results arrive as tracked changes you can accept or reject.
+- Right-click **Spelling and Grammar Suggestions** on a flagged word; *Spell Check* / *Grammar Check* switches and *Spelling Language…* under **LaTeX → Spelling and Grammar** and in the TeX menu.
+- **✨ AI menu** in the editor title bar (Write, Rewrite, Fix, provider, model, API key); **⌃L G** writes at the cursor, **⌃L ⇧G** rewrites; **Change AI Model…** lists the provider's models or takes any name.
+- **Review with AI** (⌃L V): AI review comments on the selection, the section or the file, each anchored to the words it's about with a suggested change, like GitHub Copilot's review comments. **Apply** makes the change as a tracked change, **Keep as Comment** turns it into a shared comment, **Discard** drops it. AI comments stay local (not written to `.texreview`).
+- Math hovers have a **Copy LaTeX** link.
+- *Write with AI* and *Rewrite with AI* take their instruction as a command argument, so a keybinding can run a fixed prompt.
+- README: screenshots of spelling and grammar suggestions, the AI menu, an AI rewrite and an AI insertion as tracked changes, an AI review comment; updated overview, dark-pages preview, math hover and TeX menu screenshots showing ⤓ PDF; Download PDF in the feature table.
+- **Download PDF**: ⤓ PDF in the preview toolbar (also in the browser preview) and **TeX: Download PDF…**.
+- Requires VS Code 1.90 or later.
+- New setting `texPreview.chktexSeverity` (`warning`, `information`, `hint`): show ChkTeX warnings as information or hints so style nits don't colour the file, outline and scrollbar yellow.
+
 ## 1.2.1
 - README: new introduction with a quick start, features grouped into Preview, Writing and Working together, and an updated overview screenshot.
 - New Marketplace description.

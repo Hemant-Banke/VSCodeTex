@@ -515,12 +515,13 @@ function lint(context) {
     const bin = which('chktex');
     if (!bin) return;
     const r = await exec(bin, ['-q', '-I0', '-f', '%l:%c:%d:%k:%n:%m\n'], { cwd: doc.uri.scheme === 'file' ? path.dirname(doc.uri.fsPath) : undefined, input: doc.getText() });
+    const warning = { information: vscode.DiagnosticSeverity.Information, hint: vscode.DiagnosticSeverity.Hint }[config().get('chktexSeverity')] ?? vscode.DiagnosticSeverity.Warning;
     const ds = [];
     for (const m of r.stdout.matchAll(/^(\d+):(\d+):(\d+):(\w+):(\d+):(.*)$/gm)) {
       const line = parseInt(m[1], 10) - 1;
       const col = parseInt(m[2], 10) - 1;
       if (line >= doc.lineCount) continue;
-      const sev = m[4] === 'Error' ? vscode.DiagnosticSeverity.Error : m[4] === 'Warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Information;
+      const sev = m[4] === 'Error' ? vscode.DiagnosticSeverity.Error : m[4] === 'Warning' ? warning : vscode.DiagnosticSeverity.Information;
       const d = new vscode.Diagnostic(new vscode.Range(line, col, line, col + Math.max(1, parseInt(m[3], 10))), m[6].trim(), sev);
       d.source = 'chktex';
       d.code = parseInt(m[5], 10);
@@ -549,7 +550,7 @@ function lint(context) {
       chktex.delete(d.uri);
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('texPreview.chktex')) vscode.workspace.textDocuments.forEach((d) => schedule(d, 0));
+      if (e.affectsConfiguration('texPreview.chktex') || e.affectsConfiguration('texPreview.chktexSeverity')) vscode.workspace.textDocuments.forEach((d) => schedule(d, 0));
     })
   );
   vscode.workspace.textDocuments.forEach((d) => schedule(d, 500));
