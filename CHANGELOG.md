@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.4.0
+- **No TeX? One click.** When no compiler is found, the extension offers to install Tectonic 0.17.0 (about 20 MB, checksum-verified, kept in the extension's storage); also **TeX: Install Tectonic** and a button in the preview.
+- **TeX: New LaTeX Project…**: article, thesis (chapters in their own files), Beamer, CV, homework, letter, IEEE and ACM templates that build out of the box.
+- **TeX: Add Citation…** (⌃L ⇧C / Alt+L Shift+C): BibTeX from a DOI or arXiv id, or Zotero's picker (Better BibTeX), added to the `.bib` with a readable key and no duplicates, and cited at the cursor.
+- **Paste images**: a pasted screenshot is saved under `figures/` and inserted as a figure (or just `\includegraphics`, or converted to LaTeX with AI from the paste menu). Drop images or `.tex` files from the Explorer for `\includegraphics` / `\input`.
+- **TeX AI: Image to LaTeX…**: an equation, table or notes from a screenshot or photo, with any provider that reads images.
+- **Tools for AI agents**: GitHub Copilot's agent mode can build the project and read its errors (`#compileLatex`), see its outline, labels and references (`#latexProject`) and add references by DOI or arXiv id (`#addReference`).
+- A **Get started with LaTeX** walkthrough.
+- A one-time request to rate the extension, after 20 successful builds over a few days (never again after "Rate" or "Don't Ask Again"); **TeX: Rate TeX Side Preview**.
+- README: a demo GIF and screenshots of templates, Add Citation, pasted figures, the paste menu, Image to LaTeX and the walkthrough.
+- The Marketplace name is now *TeX Side Preview: LaTeX & Overleaf*.
+- Review commands (Track Changes, Add Comment…) work even when they are what starts the extension.
+- Warnings and errors from `\input` / `\include`d files now point at that file and line, not at the same line number in the main file; warnings raised inside packages no longer point at a random line.
+- Windows: MiKTeX and TeX Live are found even when VS Code started before they were installed, and when MiKTeX's `latexmk` can't run (it needs Perl) the build falls back to tectonic or pdflatex. Stop Compiling now also stops the programs latexmk started.
+- pdflatex / xelatex / lualatex builds into `.texbuild` no longer fail with "I can't write on file" for `\include{chapters/…}`.
+- Long documents: the preview frees pages that are far off screen, so a long thesis no longer uses gigabytes of memory; a PDF that finishes loading late can no longer replace a newer one.
+- Typing and moving the cursor in large projects is lighter: project files, math spans and word counts are reused until they change.
+- Format Document for `.bib` keeps an entry it can't fully parse as written, instead of dropping its remaining fields.
+- Overleaf sync: a rejected token shows one notification and pauses polling until a new token is set, instead of queueing a sync (and a new error) every minute.
+- AI: an empty reply no longer deletes the passage, and code fences inside the reply are removed.
+- Compile errors of one project no longer clear another open project's errors.
+- Download PDF and Open in Browser no longer warn "open a .tex file first" when a `.bib` or other file is active and a preview is open.
+- The extension no longer starts in every VS Code window, only in LaTeX workspaces or when one of its commands is used.
+
 ## 1.3.0
 - The Marketplace page now shows the current screenshots (image links are tied to each release).
 - **Spell check**, offline, as you type (bundled en-US and en-GB Hunspell dictionaries, or any installed one). Only prose is checked: math, commands, citations, comments and the preamble are skipped, accents are understood and `.bib` author names are accepted. Quick fixes suggest corrections and add words to a user or workspace dictionary.

@@ -18,6 +18,12 @@ const proofing = require('./proofing');
 const ai = require('./ai');
 const aiReview = require('./aireview');
 const { BrowserServer } = require('./server');
+const installer = require('./install');
+const rating = require('./rating');
+const templates = require('./templates');
+const cite = require('./cite');
+const figures = require('./figures');
+const agent = require('./agent');
 
 /** @type {Map<string, Preview>} keyed by root .tex fsPath */
 const previews = new Map();
@@ -26,6 +32,7 @@ let diagnostics;
 let statusItem;
 let extensionUri;
 let browserServer;
+let offeredInstall = false;
 
 const WATCHED_EXT = new Set(['.tex', '.bib', '.sty', '.cls', '.ltx', '.bst', '.tikz', '.rnw', '.jnw']);
 const ROOT_EXT = new Set(['.tex', '.rnw', '.jnw']);
@@ -52,9 +59,8 @@ function activate(context) {
     vscode.commands.registerCommand('texPreview.clean', () => clean()),
     vscode.commands.registerCommand('texPreview.openExternal', () => openExternal()),
     vscode.commands.registerCommand('texPreview.openInBrowser', (opts = {}) => {
-      const ed = vscode.window.activeTextEditor;
-      const p = (ed && previewFor(ed.document.uri)) || activePreview();
-      return p ? openInBrowser(p, opts.launch !== false) : undefined;
+      const p = previewForActive();
+      return p ? openInBrowser(p, !opts || opts.launch !== false) : undefined;
     }),
     vscode.commands.registerCommand('texPreview.menu', () => showMenu()),
     vscode.commands.registerCommand('texPreview.copyText', async (text) => {
@@ -62,10 +68,7 @@ function activate(context) {
       await vscode.env.clipboard.writeText(text);
       vscode.window.setStatusBarMessage('$(copy) Copied LaTeX', 2000);
     }),
-    vscode.commands.registerCommand('texPreview.downloadPdf', () => {
-      const ed = vscode.window.activeTextEditor;
-      return downloadPdf((ed && ed.document.uri.scheme === 'file' && previewFor(ed.document.uri)) || activePreview());
-    }),
+    vscode.commands.registerCommand('texPreview.downloadPdf', () => downloadPdf(previewForActive())),
     // Keep the TeX status item visible for LaTeX files so its menu is always one click away.
     vscode.window.onDidChangeActiveTextEditor((ed) => {
       const tex = ed && /^(la)?tex$/.test(ed.document.languageId);
@@ -88,6 +91,12 @@ function activate(context) {
     vscode.languages.registerSelectionRangeProvider(LATEX, new structure.SelectionProvider()),
     vscode.languages.registerLinkedEditingRangeProvider(LATEX, new structure.LinkedEditingProvider())
   );
+  installer.activate(context);
+  rating.activate(context);
+  templates.activate(context);
+  cite.activate(context);
+  figures.activate(context);
+  agent.activate(context, { compile: compileForAgent });
   editing.activate(context);
   palette.activate(context);
   proofing.activate(context);
@@ -149,6 +158,19 @@ function previewFor(uri) {
   return preview;
 }
 
+/**
+ * The build for the active .tex editor, else the one open preview. Unlike previewFor, it doesn't
+ * warn when the active editor is some other file (a .bib, the Output panel…).
+ */
+function previewForActive() {
+  const ed = vscode.window.activeTextEditor;
+  const uri = ed && ed.document.uri;
+  if (uri && uri.scheme === 'file' && ROOT_EXT.has(path.extname(uri.fsPath).toLowerCase())) return previewFor(uri);
+  const p = activePreview();
+  if (!p) vscode.window.showWarningMessage('TeX Preview: open a .tex file first.');
+  return p;
+}
+
 function activePreview() {
   const editor = vscode.window.activeTextEditor;
   if (editor && editor.document.uri.scheme === 'file') {
@@ -156,6 +178,31 @@ function activePreview() {
     if (p) return p;
   }
   return previews.size === 1 ? [...previews.values()][0] : null;
+}
+
+/**
+ * Builds the project of `file` for an AI agent's tool call: saves the project's unsaved files,
+ * compiles (with or without a preview open) and returns the outcome with errors and warnings.
+ */
+async function compileForAgent(file) {
+  if (!ROOT_EXT.has(path.extname(file).toLowerCase())) throw new Error(`${file} is not a .tex file`);
+  if (!fs.existsSync(file)) throw new Error(`${file} does not exist`);
+  const p = previewFor(vscode.Uri.file(file));
+  for (const d of vscode.workspace.textDocuments) {
+    if (d.isDirty && d.uri.scheme === 'file' && WATCHED_EXT.has(path.extname(d.uri.fsPath).toLowerCase()) && !path.relative(p.rootDir, d.uri.fsPath).startsWith('..')) await d.save();
+  }
+  await p.compile();
+  while (p.running) await p.running; // a save may have started a newer build
+  const status = p.lastStatus || {};
+  const all = [...(p.diagFiles || [])].flatMap((f) => (diagnostics.get(vscode.Uri.file(f)) || []).map((d) => ({ file: f, line: d.range.start.line + 1, message: d.message, error: d.severity === vscode.DiagnosticSeverity.Error })));
+  const errors = all.filter((d) => d.error);
+  return {
+    root: p.root,
+    ok: status.state === 'ok',
+    message: status.message || 'no result',
+    errors: errors.length || status.state === 'ok' ? errors : (status.errors || []).map((e) => ({ file: e.file, line: e.line, message: e.message })),
+    warnings: all.filter((d) => !d.error),
+  };
 }
 
 /** Opens the PDF in the system viewer (or texPreview.externalViewer.command) and keeps it rebuilt on save. */
@@ -212,10 +259,15 @@ async function showMenu() {
     { label: '$(file-pdf) Open PDF in External Viewer', command: 'texPreview.openExternal' },
     { label: '$(cloud-download) Download PDF…', command: 'texPreview.downloadPdf' },
     { label: '$(go-to-file) Jump to Location in PDF', command: 'texPreview.syncToPdf' },
+    { label: '$(cloud-download) Install Tectonic (LaTeX compiler)…', description: 'no compiler was found', command: 'texPreview.installTectonic', hide: !!installer.findCompiler() },
+    { label: '', kind: vscode.QuickPickItemKind.Separator },
+    { label: '$(new-folder) New LaTeX Project…', description: 'article, thesis, slides, CV, IEEE, ACM…', command: 'texPreview.newProject' },
+    { label: '$(book) Add Citation…', description: 'DOI, arXiv or Zotero', command: 'texPreview.addCitation' },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     { label: '$(wand) Write with AI…', command: 'texPreview.ai.generate' },
     { label: '$(sparkle) Rewrite with AI…', command: 'texPreview.ai.rewrite' },
     { label: '$(comment-discussion) Review with AI…', command: 'texPreview.ai.review' },
+    { label: '$(file-media) Image to LaTeX…', description: 'equation, table or notes from a screenshot', command: 'texPreview.ai.imageToLatex' },
     { label: '$(settings-gear) AI Provider and Model…', command: 'texPreview.ai.menu' },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     { label: `$(${cfg.get('spellcheck.enabled') ? 'pass-filled' : 'circle-large-outline'}) Spell Check`, description: cfg.get('spellcheck.enabled') ? 'on' : 'off', command: 'texPreview.spellcheck.toggle' },
@@ -226,6 +278,7 @@ async function showMenu() {
     { label: '$(search) Insert Symbol…', command: 'texPreview.insertSymbol' },
     { label: '$(trash) Clean Auxiliary Files', command: 'texPreview.clean' },
     { label: '$(output) Show Compile Log', command: 'texPreview.showLog' },
+    { label: '$(star-empty) Rate TeX Side Preview', command: 'texPreview.rate' },
   ].filter((i) => !i.hide);
   const picked = await vscode.window.showQuickPick(items, { title: 'TeX' });
   if (picked && picked.command) vscode.commands.executeCommand(picked.command);
@@ -369,7 +422,8 @@ function run(bin, args, opts, log) {
 function killTree(proc) {
   if (!proc || proc.exitCode !== null) return;
   try {
-    if (process.platform === 'win32') proc.kill();
+    // latexmk starts pdflatex/biber as children; kill the whole tree, not just latexmk.
+    if (process.platform === 'win32') spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' }).on('error', () => proc.kill());
     else process.kill(-proc.pid, 'SIGTERM');
   } catch {
     try {
@@ -407,6 +461,15 @@ function parseLog(logText, rootFile, rootDir) {
   };
 
   const lines = logText.split(/\r?\n/);
+  // The file TeX was reading at each line, so warnings and errors from \input/\include'd files
+  // land in that file rather than at the same line number in the root.
+  const fileAt = trackFiles(lines, rootDir);
+  const sourceAt = (i) => {
+    const f = fileAt[i];
+    if (!f || !SOURCE_EXT.test(f)) return null;
+    const rel = path.relative(rootDir, f);
+    return rel.startsWith('..') || path.isAbsolute(rel) ? null : f;
+  };
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
 
@@ -433,7 +496,7 @@ function parseLog(logText, rootFile, rootDir) {
           break;
         }
       }
-      add(null, lineNo, m[1], 'error');
+      add(sourceAt(i), lineNo, m[1], 'error');
       continue;
     }
 
@@ -447,10 +510,56 @@ function parseLog(logText, rootFile, rootDir) {
         j++;
       }
       const lm = msg.match(/on input line (\d+)/);
-      add(null, lm ? parseInt(lm[1], 10) : 0, msg, 'warning');
+      const f = sourceAt(i);
+      // A line number from a package file or the like means nothing in the root file.
+      add(f, lm && (f || !fileAt[i] || fileAt[i] === rootFile) ? parseInt(lm[1], 10) : 0, msg, 'warning');
     }
   }
   return items;
+}
+
+const SOURCE_EXT = /\.(tex|ltx|tikz|rnw|jnw|bbl)$/i;
+
+/**
+ * For each log line, the file TeX was reading when it was written (absolute path, or null),
+ * following TeX's "(./file.tex … )" nesting. Message blocks with free text (errors, over/underfull
+ * boxes) are skipped so a stray parenthesis there can't throw the nesting off.
+ */
+function trackFiles(lines, rootDir) {
+  const stack = [];
+  const out = new Array(lines.length);
+  const top = () => {
+    for (let k = stack.length - 1; k >= 0; k--) if (stack[k]) return stack[k];
+    return null;
+  };
+  let skip = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    out[i] = top();
+    if (skip) {
+      if (!l.trim()) skip = false;
+      continue;
+    }
+    if (/^(! |[^:\s][^:]*:\d+: )/.test(l) || /^(Overfull|Underfull) \\[hv]box/.test(l)) {
+      skip = true;
+      continue;
+    }
+    for (let j = 0; j < l.length; j++) {
+      const ch = l[j];
+      if (ch === ')') {
+        stack.pop();
+      } else if (ch === '(') {
+        const m = /^\((?:"([^"]+)"|([^\s()"{}[\]]+))/.exec(l.slice(j));
+        const name = m && (m[1] || m[2]);
+        // A path: ./x.tex, /abs/x.sty, C:\x.cls, chapters/x.tex (tectonic) or plain name.ext;
+        // anything else is ordinary text.
+        const isFile = name && /\.[A-Za-z][\w-]{0,7}$/.test(name) && (/^(\.{1,2}[\\/]|[\\/]|[A-Za-z]:[\\/])/.test(name) || /^[\w.-]+([\\/][\w.-]+)*$/.test(name));
+        stack.push(isFile ? path.resolve(rootDir, name) : null);
+        if (m) j += m[0].length - 1;
+      }
+    }
+  }
+  return out;
 }
 
 function contextOf(lines, i) {
@@ -482,8 +591,8 @@ class Preview {
     queued.forEach((m) => res.write(`data: ${JSON.stringify(m)}\n\n`));
   }
 
-  removeClient(id) {
-    this.clients.delete(id);
+  removeClient(id, res) {
+    if (!res || this.clients.get(id)?.res === res) this.clients.delete(id);
   }
 
   showPanel() {
@@ -549,8 +658,24 @@ class Preview {
     browserServer?.forget(this);
     for (const c of this.clients.values()) c.res?.end();
     previews.delete(this.root);
-    diagnostics.clear();
-    statusItem.hide();
+    for (const f of this.diagFiles || []) diagnostics.delete(vscode.Uri.file(f));
+    if (!previews.size) statusItem.hide();
+  }
+
+  /**
+   * pdflatex writes the .aux of \include{chapters/intro} to <outDir>/chapters/, and stops with
+   * "I can't write on file" if that folder is missing; create the project's folders there.
+   */
+  mirrorFolders() {
+    if (this.outDir === this.rootDir) return;
+    try {
+      for (const f of project.projectFiles(this.root)) {
+        const rel = path.relative(this.rootDir, path.dirname(f));
+        if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) fs.mkdirSync(path.join(this.outDir, rel), { recursive: true });
+      }
+    } catch (e) {
+      output.appendLine(`[tex-preview] ${e.message}`);
+    }
   }
 
   /** To the panel and every browser tab, or to one browser tab (`client`). */
@@ -619,6 +744,9 @@ class Preview {
       case 'download':
         downloadPdf(this);
         break;
+      case 'installTectonic':
+        installer.install().then((bin) => bin && this.compile());
+        break;
     }
   }
 
@@ -660,11 +788,16 @@ class Preview {
     if (this.running) await this.running;
     if (gen !== this.generation) return; // a newer save superseded us
 
-    this.running = this.doCompile(gen).catch((e) => {
-      output.appendLine(`\n[tex-preview] ${e && e.stack ? e.stack : e}`);
-    });
-    await this.running;
-    this.running = null;
+    this.running = this.doCompile(gen)
+      .catch((e) => {
+        output.appendLine(`\n[tex-preview] ${e && e.stack ? e.stack : e}`);
+      })
+      .finally(() => {
+        if (gen === this.generation) this.proc = null; // also after an early return
+      });
+    const running = this.running;
+    await running;
+    if (this.running === running) this.running = null;
   }
 
   async doCompile(gen) {
@@ -682,10 +815,16 @@ class Preview {
           : `"${engine.name}" was not found on PATH.`;
       this.post({ type: 'status', state: 'error', message: msg, missingEngine: true, errors: [] });
       setStatus('$(error) TeX: no compiler', msg);
+      // Offer the one-click install once per session (the preview also has a button for it).
+      if (!offeredInstall && !custom && !docker && (engine.name === 'auto' || engine.name === 'tectonic')) {
+        offeredInstall = true;
+        installer.offerInstall(msg).then((ok) => ok && this.compile());
+      }
       return;
     }
 
     fs.mkdirSync(this.outDir, { recursive: true });
+    this.mirrorFolders();
     const started = Date.now();
     this.post({ type: 'status', state: 'compiling', message: `Compiling with ${engine.name}…` });
     setStatus('$(sync~spin) TeX: compiling', `Compiling ${name} with ${engine.name}`);
@@ -745,6 +884,20 @@ class Preview {
         [`-${mode}`, ...latexFlags.filter((f) => f !== '-halt-on-error'), '-f', `-outdir=${outRel}`, file],
         opts
       );
+      // MiKTeX ships latexmk, but it needs Perl, which Windows usually lacks. With engine "auto",
+      // build with the next compiler instead of failing.
+      const noPerl = /script engine|perl.*(not|couldn't|could not).*found|perl: not found|can't locate .*\.pm/i;
+      if (!docker && (cfg.get('engine') || 'auto') === 'auto' && result.code !== 0 && !result.killed && gen === this.generation && noPerl.test(result.text)) {
+        const next = ['tectonic', 'pdflatex'].map((n) => ({ name: n, bin: which(n, PATH) })).find((e) => e.bin);
+        if (next) {
+          log(`\n[tex-preview] latexmk can't run here (it needs Perl); building with ${next.name} instead.\n\n`);
+          engine.name = next.name;
+          result =
+            next.name === 'tectonic'
+              ? await this.tool(next.bin, ['--keep-logs', '--synctex', '--outdir', outRel, file], opts)
+              : await this.runPlainLatex(next.bin, PATH, file, outRel, opts, gen, false);
+        }
+      }
     } else if (engine.name === 'tectonic') {
       result = await this.tool(engine.bin, ['--keep-logs', '--synctex', '--outdir', outRel, file], opts);
     } else {
@@ -754,8 +907,11 @@ class Preview {
     if (gen !== this.generation || result.killed) return; // superseded
 
     const logText = readIfExists(path.join(this.outDir, this.base + '.log'));
-    const items = parseLog(logText + '\n' + (engine.name === 'tectonic' ? result.text : ''), this.root, this.rootDir);
-    publishDiagnostics(items, this.root);
+    // Tectonic also prints errors as "error: file:line: …"; the rest of its console output repeats
+    // the log without file context, so only those lines are taken from it.
+    const consoleErrors = engine.name === 'tectonic' ? result.text.split(/\r?\n/).filter((l) => /^(error|warning): [^:\s][^:]*\.\w+:\d+: /.test(l)).join('\n') : '';
+    const items = parseLog(logText + '\n\n' + consoleErrors, this.root, this.rootDir);
+    this.diagFiles = publishDiagnostics(items, this.root, this.diagFiles);
 
     const errors = items.filter((d) => d.severity === 'error');
     const warnings = items.filter((d) => d.severity === 'warning');
@@ -788,6 +944,7 @@ class Preview {
         : `Compiled in ${secs}s${warnings.length ? ` · ${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : ''}`,
       errors: shownErrors,
     });
+    if (!failed && pdfFresh) rating.builtOk();
     setStatus(
       failed ? '$(error) TeX: errors' : '$(check) TeX',
       failed ? 'Compile failed — click to show log' : `Compiled ${name} in ${secs}s`
@@ -897,8 +1054,9 @@ function setStatus(text, tooltip) {
   statusItem.show();
 }
 
-function publishDiagnostics(items, root) {
-  diagnostics.clear();
+/** Replaces one build's diagnostics (those in `previous`, its files last time); returns its files now. */
+function publishDiagnostics(items, root, previous = new Set()) {
+  for (const f of previous) diagnostics.delete(vscode.Uri.file(f));
   const byFile = new Map();
   for (const it of items) {
     if (!fs.existsSync(it.file)) it.file = root;
@@ -913,6 +1071,7 @@ function publishDiagnostics(items, root) {
     byFile.get(it.file).push(d);
   }
   for (const [file, ds] of byFile) diagnostics.set(vscode.Uri.file(file), ds);
+  return new Set(byFile.keys());
 }
 
 async function revealLine(file, line, word) {
@@ -941,4 +1100,4 @@ async function revealLine(file, line, word) {
   editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
-module.exports = { activate, deactivate };
+module.exports = { activate, deactivate, _parseLog: parseLog };

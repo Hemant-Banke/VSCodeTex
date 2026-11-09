@@ -500,10 +500,11 @@ function spellCheck(doc) {
   const found = misspellings(r.text, dict, known).map((m) => ({ range: sourceRange(doc, r, m.a, m.b), word: m.word }));
   spellFound.set(doc.uri.toString(), found);
   updateContext();
+  const lang = languageOf(doc);
   spellDiags.set(
     doc.uri,
     found.map((f) => {
-      const d = new vscode.Diagnostic(f.range, `"${f.word}" is not in the ${languageOf(doc)} dictionary`, vscode.DiagnosticSeverity.Information);
+      const d = new vscode.Diagnostic(f.range, `"${f.word}" is not in the ${lang} dictionary`, vscode.DiagnosticSeverity.Information);
       d.source = 'Spelling';
       return d;
     })

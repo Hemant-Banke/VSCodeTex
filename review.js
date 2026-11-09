@@ -714,10 +714,13 @@ function rangeIn(text, s, e) {
 /** Creates, updates or removes VS Code comment threads to match the stores. */
 function syncThreads(relocate = false) {
   const seen = new Set();
+  const texts = new Map(); // one read per file, not per thread
   for (const store of stores.values()) {
     for (const th of store.threads.values()) {
       seen.add(th.id);
-      const src = textOf(store, th.file);
+      const key = store.root + '\0' + th.file;
+      if (!texts.has(key)) texts.set(key, textOf(store, th.file));
+      const src = texts.get(key);
       if (!src) continue;
       let vt = vsThreads.get(th.id);
       if (!vt || relocate) {
@@ -899,7 +902,9 @@ function reloadAll() {
 async function activate(ctx, opts = {}) {
   context = ctx;
   onLogWritten = opts.onLogWritten || onLogWritten;
-  await identity(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
+  // Commands are registered before anything is awaited: when one of them is what activates the
+  // extension, VS Code runs it as soon as activate() returns.
+  const ready = identity(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
   insertDeco = vscode.window.createTextEditorDecorationType({
     backgroundColor: 'rgba(46, 160, 67, 0.18)',
     borderColor: 'rgba(46, 160, 67, 0.75)',
@@ -997,6 +1002,7 @@ async function activate(ctx, opts = {}) {
     { dispose: flushAll }
   );
 
+  await ready;
   for (const ws of vscode.workspace.workspaceFolders || []) storeFor(ws.uri);
   for (const d of vscode.workspace.textDocuments) stateFor(d);
   syncThreads();

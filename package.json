@@ -1,8 +1,8 @@
 {
   "name": "tex-side-preview",
-  "displayName": "TeX Side Preview",
-  "description": "Overleaf-style LaTeX in VS Code: live side-by-side PDF with SyncTeX, smart suggestions and hover previews, comments and tracked changes, and two-way Overleaf sync.",
-  "version": "1.3.0",
+  "displayName": "TeX Side Preview: LaTeX & Overleaf",
+  "description": "Overleaf-style LaTeX in VS Code, Cursor and VSCodium: live PDF preview with SyncTeX, one-click compiler install, templates, citations from DOI/arXiv/Zotero, AI writing and review, comments and tracked changes, and two-way Overleaf sync.",
+  "version": "1.4.0",
   "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {
@@ -18,6 +18,8 @@
   },
   "categories": [
     "Programming Languages",
+    "AI",
+    "Education",
     "Visualization",
     "Formatters",
     "Linters",
@@ -45,15 +47,21 @@
     "intellisense",
     "bibtex formatter",
     "chktex",
-    "mathjax"
+    "mathjax",
+    "latex preview",
+    "overleaf alternative",
+    "latex ai",
+    "beamer",
+    "zotero",
+    "latex templates",
+    "cursor"
   ],
   "main": "./extension.js",
   "activationEvents": [
     "onLanguage:latex",
     "onLanguage:tex",
     "onLanguage:bibtex",
-    "workspaceContains:**/*.tex",
-    "onStartupFinished"
+    "workspaceContains:**/*.tex"
   ],
   "contributes": {
     "commands": [
@@ -452,6 +460,39 @@
         "command": "texPreview.ai.clearReview",
         "title": "Clear AI Review Comments",
         "category": "TeX AI"
+      },
+      {
+        "command": "texPreview.newProject",
+        "title": "New LaTeX Project…",
+        "category": "TeX",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "texPreview.addCitation",
+        "title": "Add Citation (DOI, arXiv or Zotero)…",
+        "category": "TeX",
+        "icon": "$(book)"
+      },
+      {
+        "command": "texPreview.installTectonic",
+        "title": "Install Tectonic (LaTeX compiler)",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.checkCompiler",
+        "title": "Check LaTeX Compiler",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.rate",
+        "title": "Rate TeX Side Preview",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.ai.imageToLatex",
+        "title": "Image to LaTeX…",
+        "category": "TeX AI",
+        "icon": "$(file-media)"
       }
     ],
     "menus": {
@@ -494,6 +535,16 @@
           "command": "texPreview.open",
           "when": "resourceExtname == .tex",
           "group": "navigation"
+        },
+        {
+          "command": "texPreview.ai.imageToLatex",
+          "when": "resourceExtname =~ /^\\.(png|jpe?g|gif|webp)$/",
+          "group": "7_tex@1"
+        },
+        {
+          "command": "texPreview.newProject",
+          "when": "explorerResourceIsFolder",
+          "group": "7_tex@2"
         }
       ],
       "editor/context": [
@@ -725,6 +776,14 @@
         {
           "command": "texPreview.ai.discardComment",
           "when": "false"
+        },
+        {
+          "command": "texPreview.addCitation",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.ai.imageToLatex",
+          "when": "editorLangId =~ /^(la)?tex$/"
         }
       ],
       "texPreview.latex": [
@@ -784,6 +843,10 @@
         {
           "command": "texPreview.clean",
           "group": "3_doc@5"
+        },
+        {
+          "command": "texPreview.addCitation",
+          "group": "1_edit@0"
         }
       ],
       "texPreview.format": [
@@ -993,6 +1056,10 @@
         {
           "command": "texPreview.ai.clearReview",
           "group": "3_review@1"
+        },
+        {
+          "command": "texPreview.ai.imageToLatex",
+          "group": "1_write@5"
         }
       ],
       "texPreview.proofingMenu": [
@@ -1205,6 +1272,12 @@
         "command": "texPreview.ai.review",
         "key": "alt+l v",
         "mac": "ctrl+l v",
+        "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
+      },
+      {
+        "command": "texPreview.addCitation",
+        "key": "alt+l shift+c",
+        "mac": "ctrl+l shift+c",
         "when": "editorTextFocus && editorLangId =~ /^(la)?tex$/"
       }
     ],
@@ -1457,7 +1530,178 @@
           "when": "texPreview.texActive"
         }
       ]
-    }
+    },
+    "languageModelTools": [
+      {
+        "name": "texpreview_compile",
+        "displayName": "Compile LaTeX",
+        "toolReferenceName": "compileLatex",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(file-pdf)",
+        "tags": [
+          "latex",
+          "tex",
+          "compile"
+        ],
+        "userDescription": "Build the LaTeX project and report its errors and warnings.",
+        "modelDescription": "Compiles the LaTeX project that contains the given .tex file (saving its unsaved files first) with the user's configured compiler, and returns whether the build succeeded plus every error and warning with file and line. Use it after editing LaTeX to check the document still builds, and to find what to fix. Prefer it over running latexmk/pdflatex in a terminal: it uses the right main file, output folder and engine, and updates the user's PDF preview.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "Path of any .tex file in the project (absolute, or relative to the workspace). Defaults to the active editor."
+            }
+          }
+        }
+      },
+      {
+        "name": "texpreview_project",
+        "displayName": "LaTeX Project Info",
+        "toolReferenceName": "latexProject",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-tree)",
+        "tags": [
+          "latex",
+          "tex"
+        ],
+        "userDescription": "The project's main file, files, packages, macros, numbered outline, labels and bibliography keys.",
+        "modelDescription": "Describes the LaTeX project that contains the given .tex file: its main file, the files pulled in with \\input/\\include, document class, packages, user macros, the numbered outline of sections with file:line, all \\label names with file:line, and the bibliography entries (key, first author, year, title). Use it before writing \\ref or \\cite commands so labels and citation keys exist, and to find where a section lives.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "Path of any .tex file in the project. Defaults to the active editor."
+            }
+          }
+        }
+      },
+      {
+        "name": "texpreview_addReference",
+        "displayName": "Add LaTeX Reference",
+        "toolReferenceName": "addReference",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(book)",
+        "tags": [
+          "latex",
+          "bibtex",
+          "citation"
+        ],
+        "userDescription": "Fetch BibTeX for a DOI or arXiv id and add it to the project's .bib file.",
+        "modelDescription": "Fetches the BibTeX entry for a DOI (e.g. 10.1038/nature14539) or an arXiv id (e.g. 1706.03762) from doi.org or arxiv.org and adds it to the project's .bib file (creating references.bib if there is none), reusing an existing entry with the same DOI or arXiv id. Returns the citation key to use in \\cite{}. Only use real identifiers you are sure of; never invent DOIs.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "A DOI, an arXiv id, or a doi.org / arxiv.org URL."
+            },
+            "file": {
+              "type": "string",
+              "description": "Path of any .tex file in the project. Defaults to the active editor."
+            }
+          }
+        }
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "gettingStarted",
+        "title": "Get started with LaTeX in VS Code",
+        "description": "From an empty folder to a live PDF in a minute: a compiler, a project, the preview, AI help and Overleaf.",
+        "steps": [
+          {
+            "id": "compiler",
+            "title": "Get a LaTeX compiler",
+            "description": "Builds need a TeX distribution (TeX Live, MacTeX, MiKTeX) or Tectonic. If you have none, install Tectonic with one click: about 20 MB, and it fetches the packages a document needs.\n[Install Tectonic](command:texPreview.installTectonic)\n[Check for a compiler](command:texPreview.checkCompiler)",
+            "media": {
+              "markdown": "media/walkthrough/compiler.md"
+            },
+            "completionEvents": [
+              "onContext:texPreview.hasCompiler",
+              "onCommand:texPreview.checkCompiler",
+              "onCommand:texPreview.installTectonic"
+            ]
+          },
+          {
+            "id": "project",
+            "title": "Start a project",
+            "description": "Pick a template: article, thesis with chapters, Beamer slides, CV, homework, letter, IEEE or ACM paper. Or open a folder with your own .tex files.\n[New LaTeX Project](command:texPreview.newProject)",
+            "media": {
+              "image": "media/walkthrough/overview.png",
+              "altText": "A LaTeX source on the left and its PDF on the right"
+            },
+            "completionEvents": [
+              "onCommand:texPreview.newProject",
+              "onLanguage:latex"
+            ]
+          },
+          {
+            "id": "preview",
+            "title": "Open the live preview",
+            "description": "Click the TeX button at the top right of a .tex file, or press ⌥⌘V (Ctrl+Alt+V). Save, and the PDF updates beside your source.\n[Open Preview](command:texPreview.open)",
+            "media": {
+              "image": "media/walkthrough/overview.png",
+              "altText": "Live PDF preview beside the source"
+            },
+            "completionEvents": [
+              "onCommand:texPreview.open"
+            ]
+          },
+          {
+            "id": "sync",
+            "title": "Jump between source and PDF",
+            "description": "Double-click a word in the PDF to jump to its source line. Press ⌥⌘J (Ctrl+Alt+J) in the source to highlight that line in the PDF.\n[Jump to Location in PDF](command:texPreview.syncToPdf)",
+            "media": {
+              "image": "media/walkthrough/forward-search.png",
+              "altText": "A highlighted line in the PDF after jumping from the source"
+            },
+            "completionEvents": [
+              "onCommand:texPreview.syncToPdf"
+            ]
+          },
+          {
+            "id": "write",
+            "title": "Write faster",
+            "description": "Paste a screenshot to add it as a figure, add citations from a DOI, arXiv id or Zotero, and get suggestions for \\cite, \\ref and commands as you type.\n[Add Citation](command:texPreview.addCitation)",
+            "media": {
+              "markdown": "media/walkthrough/write.md"
+            },
+            "completionEvents": [
+              "onCommand:texPreview.addCitation"
+            ]
+          },
+          {
+            "id": "ai",
+            "title": "Write and review with AI",
+            "description": "Rewrite a paragraph, write LaTeX from a description, turn a photo of an equation into LaTeX, or get review comments, with Copilot, your Claude or ChatGPT plan, or a local model. Results arrive as tracked changes.\n[Choose AI Provider](command:texPreview.ai.chooseProvider)",
+            "media": {
+              "image": "media/walkthrough/ai-rewrite.png",
+              "altText": "An AI rewrite shown as a tracked change"
+            },
+            "completionEvents": [
+              "onCommand:texPreview.ai.chooseProvider"
+            ]
+          },
+          {
+            "id": "overleaf",
+            "title": "Work with Overleaf co-authors",
+            "description": "Clone an Overleaf project and keep it in sync both ways: your saves are pushed, their changes are pulled. Comments and tracked changes travel with it.\n[Clone Overleaf Project](command:texPreview.overleaf.clone)",
+            "media": {
+              "image": "media/walkthrough/overleaf-status.png",
+              "altText": "The Overleaf sync status in the status bar"
+            },
+            "completionEvents": [
+              "onCommand:texPreview.overleaf.clone"
+            ]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "package": "vsce package --baseImagesUrl https://raw.githubusercontent.com/Hemant-Banke/VSCodeTex/v$npm_package_version/",

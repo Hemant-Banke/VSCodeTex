@@ -57,16 +57,29 @@ function mathSpans(text) {
   return spans.sort((a, b) => a.start - b.start);
 }
 
+const spanCache = new WeakMap(); // TextDocument -> { version, text, spans }
+
+/** mathSpans of a document, reused until it changes (cursor moves and hovers ask a lot). */
+function documentSpans(document) {
+  const hit = spanCache.get(document);
+  if (hit && hit.version === document.version) return hit;
+  const text = document.getText();
+  const entry = { version: document.version, text, spans: mathSpans(text) };
+  spanCache.set(document, entry);
+  return entry;
+}
+
 /** The math span at `position`; with `strict`, only if the position is between its delimiters. */
 function mathAt(document, position, strict = false) {
   const offset = document.offsetAt(position);
+  const { text, spans } = documentSpans(document);
   const inside = (s) => {
     if (!strict) return offset >= s.start && offset <= s.end;
-    const open = /^(\$\$|\\\[|\\\(|\$)/.exec(document.getText().slice(s.start, s.start + 2));
+    const open = /^(\$\$|\\\[|\\\(|\$)/.exec(text.slice(s.start, s.start + 2));
     const len = open ? open[0].length : 0;
     return len ? offset >= s.start + len && offset <= s.end - len : offset > s.start && offset < s.end;
   };
-  const span = mathSpans(document.getText()).find(inside);
+  const span = spans.find(inside);
   if (!span) return null;
   return { ...span, range: new vscode.Range(document.positionAt(span.start), document.positionAt(span.end)) };
 }
@@ -93,4 +106,4 @@ async function render(tex, display, macros = '') {
   return { markdown: `![equation](${uri})` };
 }
 
-module.exports = { mathSpans, mathAt, render };
+module.exports = { mathSpans, mathAt, documentSpans, render };

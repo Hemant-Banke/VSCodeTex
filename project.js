@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const fileCache = new Map(); // fsPath -> { stamp, info }
+const diskCache = new Map(); // fsPath -> { stamp, text }
 
 /** Current text of a file: the open editor's buffer if there is one, otherwise the disk. */
 function read(file) {
@@ -16,8 +17,17 @@ function read(file) {
   if (doc) return { text: doc.getText(), stamp: `v${doc.version}` };
   try {
     const st = fs.statSync(file);
-    return { text: fs.readFileSync(file, 'utf8'), stamp: `m${st.mtimeMs}` };
+    const stamp = `m${st.mtimeMs}:${st.size}`;
+    // Completions, hovers, the outline and the word count all ask for every project file, often
+    // per keystroke; only read the ones that changed on disk.
+    const hit = diskCache.get(file);
+    if (hit && hit.stamp === stamp) return hit;
+    const entry = { text: fs.readFileSync(file, 'utf8'), stamp };
+    diskCache.set(file, entry);
+    if (diskCache.size > 2000) diskCache.delete(diskCache.keys().next().value);
+    return entry;
   } catch {
+    diskCache.delete(file);
     return null;
   }
 }
@@ -145,11 +155,15 @@ function parseBib(text) {
     i = comma + 1;
 
     const fields = [];
+    let partial = false; // something in the entry wasn't understood (formatting keeps it as written)
     for (;;) {
       while (i < text.length && /[\s,]/.test(text[i])) i++;
       if (i >= text.length || text[i] === close) break;
       const nm = /^([^\s=,{}()"#]+)\s*=\s*/.exec(text.slice(i, i + 200));
-      if (!nm) break;
+      if (!nm) {
+        partial = true;
+        break;
+      }
       i += nm[0].length;
       const valStart = i;
       // value: parts joined by #, each {balanced}, "quoted" or a bare word/number
@@ -178,9 +192,11 @@ function parseBib(text) {
       const raw = text.slice(valStart, i).trim();
       fields.push({ name: nm[1].toLowerCase(), raw, value: cleanBibValue(raw) });
     }
+    if (i >= text.length) partial = true; // unterminated
     while (i < text.length && text[i] !== close) i++;
-    const end = Math.min(text.length, i + 1);
-    entries.push({ type, key, fields, start, end });
+    // A partial entry ends at its balanced closing brace, not the first one after the confusion.
+    const end = partial ? skipBalanced(text, m.index + m[0].length - 1, open, close) : Math.min(text.length, i + 1);
+    entries.push({ type, key, fields, start, end, ...(partial ? { partial: true, raw: text.slice(start, end) } : {}) });
     re.lastIndex = end;
   }
   return entries;
@@ -295,7 +311,7 @@ function bibFiles(root) {
   const out = new Set();
   for (const f of projectFiles(root)) {
     for (const b of info(f)?.bibs || []) {
-      for (const cand of [path.resolve(rootDir, b), path.resolve(rootDir, b + '.bib'), path.resolve(path.dirname(f), b + '.bib')]) {
+      for (const cand of [path.resolve(rootDir, b), path.resolve(rootDir, b + '.bib'), path.resolve(path.dirname(f), b), path.resolve(path.dirname(f), b + '.bib')]) {
         if (/\.bib$/i.test(cand) && fs.existsSync(cand)) {
           out.add(cand);
           break;
@@ -336,6 +352,7 @@ function bibLine(entry) {
 
 function forget(file) {
   fileCache.delete(file);
+  diskCache.delete(file);
 }
 
 module.exports = { read, stripComments, group, parseBib, cleanBibValue, ACCENTS, findRoot, projectFiles, resolveTex, project, info, bibLine, forget, lineStarts, lineOf };

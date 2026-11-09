@@ -93,6 +93,8 @@ async function askToken(reason) {
   });
   if (!pick) return undefined;
   await ctx.secrets.store(TOKEN_KEY, pick.trim());
+  // A new token: repos that stopped on a rejected one can try again.
+  for (const r of repos.values()) r.authFailed = false;
   return pick.trim();
 }
 
@@ -128,7 +130,8 @@ class Repo {
 
   /** Serialise every git operation on this repo. */
   enqueue(fn) {
-    const next = this.chain.then(fn, fn);
+    this.queued = (this.queued || 0) + 1;
+    const next = this.chain.then(fn, fn).finally(() => this.queued--);
     this.chain = next.catch(() => {});
     return next;
   }
@@ -147,6 +150,9 @@ class Repo {
   }
 
   sync(reason) {
+    // A poll only needs to happen once: skip it if a sync is already waiting, or the token was
+    // rejected (polling would only fail again until a new token is set).
+    if (reason === 'poll' && (this.queued > 0 || this.authFailed)) return Promise.resolve();
     return this.enqueue(() => this.doSync(reason, 0));
   }
 
@@ -223,18 +229,21 @@ class Repo {
           throw new GitError(['push'], push.code, push.out);
         }
       }
+      this.authFailed = false;
       this.setState('synced');
     } catch (e) {
       output.appendLine(`[overleaf] ${e.message}`);
       if (e.authFailed) {
         this.setState('error', 'Authentication failed: set your Overleaf Git token');
-        const choice = await vscode.window.showErrorMessage(
-          'Overleaf rejected the Git token.',
-          'Set Token',
-          'Show Log'
-        );
-        if (choice === 'Set Token' && (await askToken())) this.sync('manual');
-        if (choice === 'Show Log') output.show(true);
+        const first = !this.authFailed;
+        this.authFailed = true;
+        // Not awaited: an unanswered notification must not hold up the sync queue.
+        if (first) {
+          vscode.window.showErrorMessage('Overleaf rejected the Git token.', 'Set Token', 'Show Log').then(async (choice) => {
+            if (choice === 'Set Token' && (await askToken())) this.sync('manual');
+            if (choice === 'Show Log') output.show(true);
+          });
+        }
       } else {
         this.setState('error', e.message);
       }
@@ -493,7 +502,7 @@ function activate(context, opts = {}) {
     vscode.commands.registerCommand('texPreview.overleaf.clone', cloneProject),
     vscode.commands.registerCommand('texPreview.overleaf.menu', showMenu),
     vscode.commands.registerCommand('texPreview.overleaf.syncNow', async () => {
-      if (!repos.size) await discover();
+      if (!repos.size) await safeDiscover();
       const repo = await pickRepo();
       if (repo) repo.sync('manual');
       else vscode.window.showInformationMessage('No Overleaf project in this workspace. Use "Overleaf: Clone Project…" first.');
@@ -510,7 +519,7 @@ function activate(context, opts = {}) {
     vscode.window.onDidChangeWindowState((s) => {
       if (s.focused) pollAll();
     }),
-    vscode.workspace.onDidChangeWorkspaceFolders(() => discover()),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => safeDiscover()),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('texPreview.overleaf')) {
         restartPolling();
@@ -518,7 +527,12 @@ function activate(context, opts = {}) {
       }
     })
   );
-  discover();
+  safeDiscover();
+}
+
+/** discover(), logging instead of leaving an unhandled rejection (e.g. git missing or a broken repo). */
+function safeDiscover() {
+  return discover().catch((e) => output.appendLine(`[overleaf] ${e.message || e}`));
 }
 
 function scheduleFor(uris) {

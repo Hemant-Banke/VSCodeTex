@@ -52,13 +52,16 @@ const PROVIDERS = {
     async models() {
       return vscode.lm ? (await vscode.lm.selectChatModels()).map((m) => ({ id: m.id, label: m.name || m.id, description: m.vendor })) : [];
     },
-    async run(system, prompt, token) {
+    async run(system, prompt, token, images = []) {
       if (!vscode.lm) throw new Error('needs VS Code 1.90 or later');
+      if (images.length && !vscode.LanguageModelDataPart) throw new Error('reading images needs a newer VS Code; update VS Code or choose another provider');
       const want = config().get('ai.model');
       let models = await vscode.lm.selectChatModels(want ? {} : { vendor: 'copilot' });
       if (want) models = models.filter((m) => m.id === want || m.family === want || m.name === want);
       if (!models.length) throw new Error(want ? `no language model "${want}" is available` : 'no Copilot models are available. Install GitHub Copilot Chat and sign in, or choose another provider');
-      const res = await models[0].sendRequest([vscode.LanguageModelChatMessage.User(`${system}\n\n${prompt}`)], { justification: 'TeX Preview sends the passage you picked and nearby text to rewrite or write LaTeX.' }, token);
+      const text = `${system}\n\n${prompt}`;
+      const content = images.length ? [new vscode.LanguageModelTextPart(text), ...images.map((i) => vscode.LanguageModelDataPart.image(i.data, i.mime))] : text;
+      const res = await models[0].sendRequest([vscode.LanguageModelChatMessage.User(content)], { justification: 'TeX Preview sends the passage you picked and nearby text to rewrite or write LaTeX.' }, token);
       let out = '';
       for await (const t of res.text) out += t;
       return out;
@@ -73,13 +76,21 @@ const PROVIDERS = {
       { id: 'opus', label: 'Opus', description: 'most capable' },
       { id: 'haiku', label: 'Haiku', description: 'fastest' },
     ],
-    async run(system, prompt, token) {
+    async run(system, prompt, token, images = []) {
       const bin = which('claude');
       if (!bin) throw new Error('the Claude Code CLI (`claude`) was not found. Install it from https://claude.com/claude-code and run `claude` once to sign in');
       const model = config().get('ai.model');
       // No tools, MCP servers or saved session: a plain completion.
-      const args = ['-p', '--output-format', 'text', '--tools', '', '--no-session-persistence', '--strict-mcp-config', '--system-prompt', system, ...(model ? ['--model', model] : [])];
-      return runCli(bin, args, prompt, token);
+      const base = ['-p', '--tools', '', '--no-session-persistence', '--strict-mcp-config', '--system-prompt', system, ...(model ? ['--model', model] : [])];
+      if (!images.length) return runCli(bin, [...base, '--output-format', 'text'], prompt, token);
+      // Images go in as content blocks of a stream-json user message.
+      const content = [...images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mime, data: Buffer.from(i.data).toString('base64') } })), { type: 'text', text: prompt }];
+      const out = await runCli(bin, [...base, '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'], JSON.stringify({ type: 'user', message: { role: 'user', content } }) + '\n', token);
+      if (out == null) return null;
+      const result = out.split('\n').map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((m) => m && m.type === 'result').pop();
+      if (!result) throw new Error('no answer from claude');
+      if (result.is_error) throw new Error(String(result.result || 'claude reported an error'));
+      return result.result;
     },
   },
   codex: {
@@ -87,19 +98,27 @@ const PROVIDERS = {
     description: 'Codex CLI, uses your ChatGPT plan',
     available: () => !!which('codex'),
     models: async () => [],
-    async run(system, prompt, token) {
+    async run(system, prompt, token, images = []) {
       const bin = which('codex');
       if (!bin) throw new Error('the Codex CLI (`codex`) was not found. Install it (npm i -g @openai/codex) and run `codex login`');
       const model = config().get('ai.model');
-      const out = path.join(os.tmpdir(), `texpreview-codex-${process.pid}-${Date.now()}.txt`);
-      const args = ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never', '--output-last-message', out, ...(model ? ['-m', model] : []), '-'];
-      const stdout = await runCli(bin, args, `${system}\n\n${prompt}`, token);
+      const stem = path.join(os.tmpdir(), `texpreview-codex-${process.pid}-${Date.now()}`);
+      const out = `${stem}.txt`;
+      const imageFiles = images.map((img, k) => {
+        const f = `${stem}-${k}.${img.mime === 'image/jpeg' ? 'jpg' : 'png'}`;
+        fs.writeFileSync(f, img.data);
+        return f;
+      });
+      const args = ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never', '--output-last-message', out, ...(model ? ['-m', model] : []), ...imageFiles.flatMap((f) => ['-i', f]), '-'];
       try {
-        return fs.readFileSync(out, 'utf8');
-      } catch {
-        return stdout;
+        const stdout = await runCli(bin, args, `${system}\n\n${prompt}`, token);
+        try {
+          return fs.readFileSync(out, 'utf8');
+        } catch {
+          return stdout;
+        }
       } finally {
-        fs.rm(out, { force: true }, () => {});
+        for (const f of [out, ...imageFiles]) fs.rm(f, { force: true }, () => {});
       }
     },
   },
@@ -116,7 +135,7 @@ const PROVIDERS = {
       if (!res.ok) throw new Error(`${this.base()}/models: ${res.status}`);
       return ((await res.json()).data || []).map((m) => ({ id: m.id, label: m.id }));
     },
-    async run(system, prompt, token) {
+    async run(system, prompt, token, images = []) {
       let model = config().get('ai.model');
       if (!model) model = await pickModel('openai');
       if (!model) return null;
@@ -127,7 +146,17 @@ const PROVIDERS = {
         res = await fetch(`${this.base()}/chat/completions`, {
           method: 'POST',
           headers: await this.headers(),
-          body: JSON.stringify({ model, temperature: 0.2, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }),
+          body: JSON.stringify({
+            model,
+            temperature: 0.2,
+            messages: [
+              { role: 'system', content: system },
+              {
+                role: 'user',
+                content: images.length ? [{ type: 'text', text: prompt }, ...images.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime};base64,${Buffer.from(i.data).toString('base64')}` } }))] : prompt,
+              },
+            ],
+          }),
           signal: ctrl.signal,
         });
       } catch (e) {
@@ -196,6 +225,7 @@ async function showMenu() {
     { label: '$(sparkle) Rewrite with AI…', description: '⌃L ⇧G · improve, shorten, formalise the selection or paragraph', command: 'texPreview.ai.rewrite' },
     { label: '$(comment-discussion) Review with AI…', description: '⌃L V · comments with suggested changes, like a co-author', command: 'texPreview.ai.review' },
     { label: '$(debug-alt) Fix Compile Error with AI', description: 'the error nearest the cursor', command: 'texPreview.ai.fixError' },
+    { label: '$(file-media) Image to LaTeX…', description: 'a screenshot of an equation, table or notes; or paste the image into the file', command: 'texPreview.ai.imageToLatex' },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     { label: '$(plug) Choose AI Provider…', description: p ? p.label.replace(/\$\([^)]*\)\s*/, '') : 'not set', command: 'texPreview.ai.chooseProvider' },
     { label: '$(symbol-misc) Change AI Model…', description: p ? model || 'default' : '', command: 'texPreview.ai.chooseModel' },
@@ -242,13 +272,13 @@ async function setApiKey() {
 }
 
 /** The model's reply to `prompt`, with progress and cancel; null if cancelled or failed. */
-async function complete(title, system, prompt) {
+async function complete(title, system, prompt, images = []) {
   let id = config().get('ai.provider');
   if (!PROVIDERS[id]) id = await chooseProvider();
   if (!id) return null;
   return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title, cancellable: true }, async (_, token) => {
     try {
-      const out = await PROVIDERS[id].run(system, prompt, token);
+      const out = await PROVIDERS[id].run(system, prompt, token, images);
       return token.isCancellationRequested ? null : out;
     } catch (e) {
       if (token.isCancellationRequested) return null;
@@ -291,11 +321,12 @@ function surroundings(doc, range, before = 3000, after = 1500) {
 }
 
 function extract(reply, tag = 'latex') {
+  const unfence = (s) => s.replace(/^\s*```(?:latex|tex)?[ \t]*\n/, '').replace(/\n```\s*$/, '');
   const m = new RegExp(`<${tag}>\\n?([\\s\\S]*?)\\n?</${tag}>`).exec(reply);
-  if (m) return m[1];
+  if (m) return tag === 'latex' ? unfence(m[1]) : m[1];
   if (tag !== 'latex') return null;
   // Models sometimes ignore the tags: take the reply without a code fence.
-  return reply.trim().replace(/^```(?:latex|tex)?\s*\n/, '').replace(/\n```$/, '');
+  return unfence(reply.trim());
 }
 
 // ---------------------------------------------------------------------------
@@ -375,6 +406,8 @@ async function rewrite(editor, preset) {
   const reply = await complete('AI: rewriting…', SYSTEM, prompt);
   if (reply == null) return;
   const text = extract(reply);
+  // An empty answer is a failed answer, not a request to delete the passage.
+  if (!text.trim()) return vscode.window.showWarningMessage('AI: the model returned an empty passage; nothing was replaced.');
   if (doc.getText(range) !== passage) return vscode.window.showWarningMessage('AI: the passage changed while the model was working; nothing was replaced.');
   if (text.trim() === passage.trim()) return vscode.window.showInformationMessage('AI: no changes suggested.');
   const r = await applyResult(doc, range, text);
@@ -448,6 +481,7 @@ async function fixError(uri, diagnostic) {
   if (reply == null) return;
   const text = extract(reply);
   const why = extract(reply, 'why');
+  if (!text.trim()) return vscode.window.showWarningMessage(`AI: the model returned an empty excerpt; nothing was replaced. ${why || ''}`);
   if (doc.getText(range) !== excerpt) return vscode.window.showWarningMessage('AI: the file changed while the model was working; nothing was replaced.');
   if (text.trim() === excerpt.trim()) return vscode.window.showInformationMessage(`AI: no change to this part of the file. ${why || ''}`);
   const r = await applyResult(doc, range, text);
@@ -456,6 +490,43 @@ async function fixError(uri, diagnostic) {
     ed.revealRange(r, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     if (why) vscode.window.showInformationMessage(`AI: ${why}`);
   }
+}
+
+const IMAGE_PROMPT = `Transcribe the image into LaTeX source that reproduces it.
+- An equation or derivation: display math (\\begin{equation*} … \\end{equation*}, or align* for several lines), no surrounding prose.
+- A table: a tabular inside a table environment, with booktabs rules.
+- Handwritten or printed text with math: the text as LaTeX, with inline math in $ … $.
+- A diagram: a short TikZ picture if it is simple, otherwise a figure with an \\includegraphics placeholder and a caption describing it.
+Transcribe exactly what is shown; do not solve, correct or extend it.`;
+
+/** LaTeX for an image (an equation, a table, handwriting…) from a model that can read images; null if cancelled. */
+async function imageToLatex(doc, image) {
+  const prompt = `Preamble of the document:\n<preamble>\n${preamble(doc)}\n</preamble>\n\n${IMAGE_PROMPT}\nUse packages and macros the preamble already loads where you can.\nReturn only the LaTeX inside <latex></latex>.`;
+  const reply = await complete('AI: reading the image…', SYSTEM, prompt, [image]);
+  if (reply == null) return null;
+  const text = extract(reply).trim();
+  return text || null;
+}
+
+const IMAGE_MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
+
+/** TeX AI: Image to LaTeX… — an image file (picked, or right-clicked in the Explorer) to LaTeX at the cursor. */
+async function imageToLatexCommand(uri) {
+  const editor = vscode.window.activeTextEditor && isTex(vscode.window.activeTextEditor.document) ? vscode.window.activeTextEditor : vscode.window.visibleTextEditors.find((e) => isTex(e.document));
+  if (!editor) return vscode.window.showInformationMessage('AI: open the .tex file to insert into first.');
+  if (!(uri instanceof vscode.Uri)) {
+    const picked = await vscode.window.showOpenDialog({ title: 'Image to LaTeX: pick a screenshot or photo of an equation, table or notes', canSelectMany: false, filters: { Images: ['png', 'jpg', 'jpeg', 'gif', 'webp'] } });
+    if (!picked) return;
+    uri = picked[0];
+  }
+  const mime = IMAGE_MIME[path.extname(uri.fsPath).toLowerCase()];
+  if (!mime) return vscode.window.showWarningMessage('AI: use a PNG, JPEG, GIF or WebP image.');
+  const data = await vscode.workspace.fs.readFile(uri);
+  const text = await imageToLatex(editor.document, { data, mime });
+  if (!text) return;
+  const at = editor.selection;
+  const r = await applyResult(editor.document, at, text);
+  if (r) editor.selection = new vscode.Selection(r.start, r.end);
 }
 
 class FixActions {
@@ -490,6 +561,7 @@ function activate(context) {
     vscode.commands.registerCommand('texPreview.ai.chooseModel', chooseModel),
     vscode.commands.registerCommand('texPreview.ai.menu', showMenu),
     vscode.commands.registerCommand('texPreview.ai.setApiKey', setApiKey),
+    vscode.commands.registerCommand('texPreview.ai.imageToLatex', imageToLatexCommand),
     vscode.languages.registerCodeActionsProvider(LATEX, new FixActions(), { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] })
   );
 }
@@ -501,4 +573,4 @@ function providerName() {
   return p ? p.label.replace(/\$\([^)]*\)\s*/, '') + (model ? ` (${model})` : '') : 'AI';
 }
 
-module.exports = { activate, extract, applyResult, complete, preamble, providerName, SYSTEM };
+module.exports = { activate, extract, applyResult, complete, preamble, providerName, imageToLatex, SYSTEM, PROVIDERS };

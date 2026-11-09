@@ -64,8 +64,10 @@ class BrowserServer {
     if (route === 'events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
       res.write(': connected\n\n');
-      preview.addClient(url.searchParams.get('id') || '', res);
-      req.on('close', () => preview.removeClient(url.searchParams.get('id') || ''));
+      const id = url.searchParams.get('id') || '';
+      preview.addClient(id, res);
+      // After a reconnect the old stream's close can arrive late; it must not drop the new one.
+      req.on('close', () => preview.removeClient(id, res));
       return;
     }
     if (route === 'msg' && req.method === 'POST') {

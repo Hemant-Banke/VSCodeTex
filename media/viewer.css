@@ -145,6 +145,18 @@ body.browser #open-browser { display: none; }
 #errors .loc { font-family: var(--vscode-editor-font-family, monospace); color: var(--err); flex: none; }
 #errors .msg { overflow-wrap: anywhere; }
 #errors .hint { padding: 4px; line-height: 1.6; }
+#errors .install-btn {
+  margin: 2px 0 6px;
+  padding: 4px 12px;
+  font: inherit;
+  border: none;
+  border-radius: 3px;
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, #0e639c);
+  cursor: pointer;
+}
+#errors .install-btn:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
+#errors .install-btn:disabled { opacity: .6; cursor: default; }
 #errors code { font-family: var(--vscode-editor-font-family, monospace); background: rgba(128,128,128,.2); padding: 0 4px; border-radius: 3px; }
 #errors .link {
   margin-top: 4px;

@@ -51,6 +51,16 @@
           '• Linux: <code>sudo apt install texlive-full latexmk</code><br>' +
           '• Windows: install MiKTeX or TeX Live<br>' +
           'Or set <code>texPreview.extraPath</code> if it is installed somewhere unusual.';
+        // The quickest way to a first PDF: no TeX distribution needed.
+        const install = document.createElement('button');
+        install.className = 'install-btn';
+        install.textContent = 'Install Tectonic for me (about 20 MB)';
+        install.addEventListener('click', () => {
+          install.disabled = true;
+          install.textContent = 'Installing…';
+          vscode.postMessage({ type: 'installTectonic' });
+        });
+        div.prepend(install, document.createElement('br'));
         errorsEl.appendChild(div);
       }
       for (const e of errs) {
@@ -90,10 +100,14 @@
     zoomLabel.textContent = state.zoom === 'fit' ? 'Fit' : Math.round(state.zoom * 100) + '%';
   }
 
+  let loadSeq = 0;
   async function loadPdf(base64) {
+    // PDFs can arrive back to back (the last build on open, then a fresh one); a slower load of
+    // an older one must not replace a newer one.
+    const seq = ++loadSeq;
     await workerReady;
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    pdfBytes = bytes.slice(); // pdf.js takes ownership of the buffer it's given
+    const copy = bytes.slice(); // pdf.js takes ownership of the buffer it's given
     const doc = await pdfjsLib.getDocument({
       data: bytes,
       isEvalSupported: false,
@@ -107,6 +121,11 @@
       const vp = (await doc.getPage(i)).getViewport({ scale: 1 });
       sizes.push([vp.width, vp.height]);
     }
+    if (seq !== loadSeq) {
+      doc.destroy();
+      return;
+    }
+    pdfBytes = copy;
     const old = pdfDoc;
     pdfDoc = doc;
     pageSizes = sizes;
@@ -163,6 +182,7 @@
     updateZoomLabel();
 
     if (observer) observer.disconnect();
+    if (releaser) releaser.disconnect();
     observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -174,7 +194,30 @@
       },
       { root: viewer, rootMargin: '600px 0px' }
     );
-    els.forEach((el) => observer.observe(el));
+    // Pages far off screen give their canvas back: a long document at full resolution would
+    // otherwise hold gigabytes of pixels.
+    releaser = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) if (!entry.isIntersecting && entry.target.dataset.rendered === 'done') releasePage(entry.target);
+      },
+      // Keep about four pages either side, so scrolling back a little doesn't re-render.
+      { root: viewer, rootMargin: `${Math.max(3000, Math.round(4 * Math.max(...pageSizes.map((s) => s[1])) * scale))}px 0px` }
+    );
+    els.forEach((el) => {
+      observer.observe(el);
+      releaser.observe(el);
+    });
+  }
+  let releaser = null;
+
+  function releasePage(el) {
+    el.querySelectorAll(':scope > canvas').forEach((c) => {
+      c.width = 0; // frees the backing store right away
+      c.height = 0;
+      c.remove();
+    });
+    el.querySelectorAll(':scope > .textLayer, :scope > .links').forEach((n) => n.remove());
+    delete el.dataset.rendered;
   }
 
   async function renderPage(el, index, scale, token) {

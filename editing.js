@@ -340,11 +340,25 @@ function menuContext(context) {
 // ---------------------------------------------------------------------------
 // Word count: a status bar item for LaTeX files, and a breakdown on click
 
+const statsCache = new Map(); // file -> { key, stats }
+
+/** textStats of a project file, recounted only when its text changes. */
+function fileStats(file, bodyOnly) {
+  const r = project.read(file);
+  const key = `${r ? r.stamp : ''}:${bodyOnly}`;
+  const hit = statsCache.get(file);
+  if (hit && hit.key === key) return hit.stats;
+  const stats = textStats(r ? r.text : '', bodyOnly);
+  statsCache.set(file, { key, stats });
+  if (statsCache.size > 1000) statsCache.delete(statsCache.keys().next().value);
+  return stats;
+}
+
 function projectStats(doc) {
   const add = (a, b) => ({ words: a.words + b.words, chars: a.chars + b.chars, charsNoSpaces: a.charsNoSpaces + b.charsNoSpaces, inlineMath: a.inlineMath + b.inlineMath, displayMath: a.displayMath + b.displayMath });
   if (doc.uri.scheme !== 'file') return { total: textStats(doc.getText(), true), files: [] };
   const root = project.findRoot(doc.uri.fsPath);
-  const files = project.projectFiles(root).map((f) => ({ file: f, stats: textStats(project.read(f)?.text || '', f === root) }));
+  const files = project.projectFiles(root).map((f) => ({ file: f, stats: fileStats(f, f === root) }));
   return { root, total: files.reduce((a, f) => add(a, f.stats), { words: 0, chars: 0, charsNoSpaces: 0, inlineMath: 0, displayMath: 0 }), files };
 }
 
@@ -359,13 +373,17 @@ function wordCountStatus(context) {
   item.command = 'texPreview.wordCount';
   context.subscriptions.push(item);
   let timer;
+  let lastTotal = null; // { doc, version, total }: a cursor move doesn't change the total
   const update = () => {
     const ed = vscode.window.activeTextEditor;
     if (!ed || !isTex(ed.document)) {
       item.hide();
       return;
     }
-    const { total } = projectStats(ed.document);
+    if (!lastTotal || lastTotal.doc !== ed.document || lastTotal.version !== ed.document.version) {
+      lastTotal = { doc: ed.document, version: ed.document.version, total: projectStats(ed.document).total };
+    }
+    const { total } = lastTotal;
     const sel = selectionStats(ed);
     item.text = sel !== null ? `${sel.toLocaleString()} of ${total.words.toLocaleString()} words` : `${total.words.toLocaleString()} words`;
     item.tooltip = `${total.words.toLocaleString()} words · ${total.chars.toLocaleString()} characters (${total.charsNoSpaces.toLocaleString()} without spaces)\nText only: math, commands and comments are not counted.\nClick for details.`;
@@ -379,8 +397,11 @@ function wordCountStatus(context) {
     vscode.window.onDidChangeActiveTextEditor(() => later(50)),
     vscode.window.onDidChangeTextEditorSelection(() => later(150)),
     vscode.workspace.onDidChangeTextDocument((e) => {
-      if (isTex(e.document)) later(600);
-    })
+      if (!isTex(e.document)) return;
+      lastTotal = null; // possibly another file of the project
+      later(600);
+    }),
+    vscode.workspace.onDidSaveTextDocument(() => (lastTotal = null))
   );
   later(300);
 }
@@ -464,7 +485,7 @@ function formatBib(doc, opts) {
   for (const e of entries) {
     const between = text.slice(last, e.start).trim();
     if (between) out += between + '\n\n';
-    if (!e.fields) out += e.raw.trim() + '\n\n';
+    if (!e.fields || e.partial) out += e.raw.trim() + '\n\n';
     else {
       const width = Math.max(0, ...e.fields.map((f) => f.name.length));
       const body = e.fields.map((f) => `${unit}${f.name.padEnd(width)} = ${f.raw.replace(/\s*\n\s*/g, ' ')},`).join('\n');

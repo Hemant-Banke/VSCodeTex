@@ -2,4 +2,5 @@ node_modules/
 .texbuild/
 *.vsix
 test/
-.texreview/.DS_Store
+.texreview/
+.DS_Store

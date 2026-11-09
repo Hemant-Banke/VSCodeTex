@@ -1,6 +1,8 @@
 # TeX Side Preview
 
-**Overleaf-style LaTeX writing, previewing and reviewing, inside VS Code.**
+**Overleaf-style LaTeX writing, previewing and reviewing, inside VS Code, Cursor and VSCodium.**
+
+![Typing a sentence, adding a citation from an arXiv link with Ctrl+L Shift+C, saving so the PDF rebuilds with the new reference, then jumping from the source line to the highlighted line in the PDF](docs/images/demo.gif)
 
 Write on the left and the PDF updates on the right every time you save. Click between the source and the PDF in either direction. Get suggestions for citations, labels and commands, and see math, figures and references rendered on hover. Review with co-authors through comments and tracked changes, and keep the project in sync with Overleaf both ways.
 
@@ -10,9 +12,14 @@ It feels like part of VS Code rather than something bolted on. Everything works 
 
 ### Quick start
 
-1. Install a LaTeX distribution (TeX Live, MacTeX or MiKTeX) or [tectonic](https://tectonic-typesetting.github.io), and this extension.
-2. Open a `.tex` file and click the **T<sub>E</sub>X** button at the top right of the editor, or press ⌥⌘V (Ctrl+Alt+V).
-3. Edit and save. The PDF refreshes beside your source.
+1. Install this extension. If you have no LaTeX installed, it offers to install [Tectonic](https://tectonic-typesetting.github.io) for you in one click (about 20 MB); TeX Live, MacTeX and MiKTeX work too.
+2. Run **TeX: New LaTeX Project…** for a ready-to-build article, thesis, Beamer talk, CV, homework, letter, IEEE or ACM paper, or open your own `.tex` files.
+3. Open a `.tex` file and click the **T<sub>E</sub>X** button at the top right of the editor, or press ⌥⌘V (Ctrl+Alt+V).
+4. Edit and save. The PDF refreshes beside your source.
+
+VS Code also shows a **Get started with LaTeX** walkthrough after installing (Help → Welcome → Walkthroughs).
+
+<img src="docs/images/walkthrough.png" alt="The Get started with LaTeX walkthrough: Get a LaTeX compiler (with Install Tectonic and Check for a compiler buttons), Start a project, Open the live preview, Jump between source and PDF, Write faster, Write and review with AI, Work with Overleaf co-authors" width="720">
 
 To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([details](#overleaf-sync)). To review, press ⌃L R (Alt+L R) for Track Changes or ⌃L K (Alt+L K) to comment on the selection ([details](#comments-and-tracked-changes)).
 
@@ -55,19 +62,24 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 | 🔗 **A real PDF viewer** | Working links, text selection and copy, zoom, a Sections menu, and dark pages (◐). |
 | ⬇️ **Download PDF** | **⤓ PDF** in the preview's toolbar saves a copy of the compiled PDF (Downloads by default), in VS Code or the browser preview. |
 | 🌐 **Browser and external viewers** | The same live preview in a browser tab, or the PDF in your own viewer. |
-| 🚨 **Clickable errors** | Listed above the PDF and in the Problems panel; the last good PDF stays visible. |
+| 🚨 **Clickable errors** | Listed above the PDF and in the Problems panel, in the right file and line; the last good PDF stays visible. |
+| 📦 **No TeX? No problem** | One click installs Tectonic, a small self-contained LaTeX engine, just for this extension. |
 
 **Writing**
 
 | | |
 |---|---|
+| 🆕 **Project templates** | Article, thesis with chapters, Beamer slides, CV, homework, letter, IEEE and ACM papers, ready to build. |
+| 📚 **Citations from a DOI, arXiv or Zotero** | Paste a DOI or arXiv link (or pick in Zotero): the BibTeX goes into your `.bib` file and `\cite{…}` at the cursor. |
+| 🖼️ **Paste and drop images** | Paste a screenshot to save it under `figures/` as a captioned figure; drop images or `.tex` files from the Explorer. |
 | 💡 **Suggestions** | `\cite` keys, `\ref` labels with their numbers, 220+ commands with their symbols, environments, files and packages. |
 | 🔍 **Hover previews** | Rendered math, citation details, referenced equations, figure thumbnails and package links. |
 | 🔣 **Symbol palette** | Click to insert Greek letters, relations, arrows, accents, matrices, figures and tables. |
 | ✍️ **Editing keys** | Bold, italic, inline math, surround with a command or environment, promote/demote headings, `\item` lists. |
 | 🗂️ **Outline** | Headings numbered as in the PDF, plus figures, tables and theorems; folding and Expand Selection. |
 | 🔤 **Spelling and grammar** | Offline spell check that skips math, commands and citations; optional grammar checks with LanguageTool. |
-| ✨ **AI writing help** | Rewrite a passage, write LaTeX at the cursor, get review comments with suggested changes, or fix a compile error, with Copilot, your Claude or ChatGPT subscription, or any open model. Results arrive as tracked changes. |
+| ✨ **AI writing help** | Rewrite a passage, write LaTeX at the cursor, turn a screenshot of an equation or table into LaTeX, get review comments with suggested changes, or fix a compile error, with Copilot, your Claude or ChatGPT subscription, or any open model. Results arrive as tracked changes. |
+| 🤖 **Tools for AI agents** | Copilot's agent mode can build your project and read its errors, see its outline, labels and references, and add references by DOI, so it can fix a paper the way it fixes code. |
 | 🧹 **Format, lint and count** | Format Document for `.tex` and `.bib`, duplicate-label warnings, optional ChkTeX, and a word count in the status bar. |
 
 **Working together**
@@ -90,6 +102,8 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 - Clickable links in the PDF, text selection and copy, zoom (buttons, Fit, ⌘/Ctrl + wheel).
 - Errors listed above the PDF and in the Problems panel; the last good PDF stays visible.
 - latexmk, tectonic, pdflatex, xelatex or lualatex (with BibTeX); your own build command; Docker; knitr/Weave.
+- No TeX installed: **TeX: Install Tectonic** downloads a pinned, checksum-verified Tectonic for the extension's own use (also offered when no compiler is found).
+- **TeX: New LaTeX Project…** with eight templates that build out of the box.
 - Stop a compile, clean auxiliary files, show the full log; **TeX** status bar menu for all of these.
 - Main file found automatically (or via `% !TEX root`); `\input`, `\include`, `\subfile` and `\import` followed.
 - Two-way Overleaf sync over Git, with conflicts resolved in VS Code's merge editor.
@@ -101,6 +115,8 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 
 **Writing**
 - Suggestions for `\cite` (from `.bib` files and `thebibliography`, searchable by author or title), `\ref` (with printed numbers), 220+ commands with their symbols, your own macros, environments with the matching `\end`, file paths and packages.
+- **TeX: Add Citation…** (⌃L ⇧C): BibTeX from a DOI (doi.org) or arXiv id, or Zotero's picker (Better BibTeX); added to the project's `.bib` with a readable key, without duplicates, and cited at the cursor.
+- Paste a screenshot into a `.tex` file to save it under `figures/` (or your `\graphicspath`) and insert a figure; drop images or `.tex` files from the Explorer to insert `\includegraphics` or `\input`.
 - `@` shortcuts (`@a` → `\alpha`, `@/` → `\frac`, `@R` → `ℝ` …) and uppercase shortcuts (`BEQ` → equation, `FBF` → `\textbf` …).
 - Hover previews: rendered math with your macros; citation details; referenced equations, captions and sections; figure thumbnails (PDF figures too); package and command help with the symbol's glyph.
 - Symbols palette (⌃L P) and **Insert Symbol…** (⌃L .) with recent symbols and search; math symbols get `$…$` outside math, and a selection becomes the first argument.
@@ -130,7 +146,9 @@ The extension runs your local LaTeX installation and uses the first compiler it 
 | `tectonic` | `brew install tectonic` | A small single binary that downloads packages on first use (the first compile takes a few minutes, later ones a few seconds). |
 | `pdflatex` | comes with TeX Live / MiKTeX | Fallback. Runs BibTeX and reruns as needed. |
 
-On Linux, `sudo apt install texlive-full latexmk` works. On Windows, install MiKTeX or TeX Live. The extension also looks in the usual install folders (`/Library/TeX/texbin`, `/opt/homebrew/bin`, `/usr/local/texlive/*/bin/*`, …), so it works even when VS Code is started from the Dock.
+**No TeX installed?** Skip this step: when no compiler is found, the extension offers to install Tectonic (about 20 MB, a pinned release checked against its published checksum, kept in the extension's own storage). It's also **TeX: Install Tectonic** and a button in the preview. The first build downloads the packages your document uses.
+
+On Linux, `sudo apt install texlive-full latexmk` works. On Windows, install MiKTeX or TeX Live; if MiKTeX's `latexmk` can't run because Perl is missing, the extension builds with pdflatex instead. The extension also looks in the usual install folders (`/Library/TeX/texbin`, `/opt/homebrew/bin`, `/usr/local/texlive/*/bin/*`, …), so it works even when VS Code is started from the Dock.
 
 ### 2. Install the extension
 
@@ -262,6 +280,38 @@ All of this works in `.tex` files with no setup, and it reads the whole project:
 
 <img src="docs/images/completion-at.png" alt="Typing @ lists the math shortcuts" width="560">
 
+### New project from a template
+
+**TeX: New LaTeX Project…** (also in the **TeX** status bar menu and on a folder's right-click menu) asks for a template and a place, creates the folder and opens `main.tex` with its preview:
+
+<img src="docs/images/new-project.png" alt="The New LaTeX project template picker: Article, Thesis or dissertation, Presentation (Beamer), CV / résumé, Homework / problem set, Letter, IEEE conference paper, ACM conference paper" width="720">
+
+| Template | What you get |
+|---|---|
+| Article | `article` with math, a theorem, a booktabs table and a bibliography |
+| Thesis or dissertation | `report` with a title page, abstract, contents, one file per chapter under `chapters/`, `figures/` and a bibliography |
+| Presentation (Beamer) | Title, outline, overlays, two columns, a closing slide |
+| CV / résumé | One page, no extra packages |
+| Homework / problem set | Numbered problems with solutions |
+| Letter | The `letter` class |
+| IEEE conference paper | `IEEEtran` (conference) |
+| ACM conference paper | `acmart` (sigconf) |
+
+### Citations from a DOI, arXiv or Zotero
+
+Press **⌃L ⇧C** (Alt+L Shift+C), or **TeX: Add Citation…**, and paste a DOI, an arXiv id, or a `doi.org` / `arxiv.org` link. The BibTeX is fetched from doi.org or arXiv, added to the project's `.bib` file with a readable key (`vaswani2017attention`) and cited at the cursor (inside an existing `\cite{…}`, the key is added to it). A paper that is already in the `.bib` (same DOI or arXiv id) is cited, not added twice. With no `.bib` yet, `references.bib` is created and the bibliography is added to the main file.
+
+<img src="docs/images/add-citation.png" alt="Add citation with an arXiv link pasted: Fetch arXiv 1706.03762 from arxiv.org, and Pick from Zotero" width="720">
+
+**Pick from Zotero…** opens Zotero's own citation picker (Zotero must be running with the [Better BibTeX](https://retorque.re/zotero-better-bibtex/) add-on) and adds the chosen items with their Better BibTeX keys.
+
+### Pasting and dropping images
+
+- **Paste a screenshot** into a `.tex` file: it's saved as `figures/pasted-<date>.png` (or in the first `\graphicspath` folder) and inserted as a `figure` with `\includegraphics`, a caption to fill in and a label. `\usepackage{graphicx}` is added if it's missing. The paste menu (the small button after pasting) also offers just `\includegraphics`, or **Convert image to LaTeX with AI**: an equation, table or handwritten notes become LaTeX.
+- **Drag images** from the Explorer (or the desktop: they're copied into `figures/`) to insert them as a figure, or **drag a `.tex` file** to `\input` it.
+
+<img src="docs/images/paste-image.png" alt="A pasted plot inserted as a figure with includegraphics, caption and label, and shown as Figure 1 in the PDF" width="49%"> <img src="docs/images/paste-options.png" alt="The paste menu after pasting an image: Insert image as a figure, Insert image with includegraphics, Convert image to LaTeX with AI" width="49%">
+
 ### Symbol palette
 
 Click the **∑-style operator icon** in the editor's title bar (next to the T<sub>E</sub>X preview button), press ⌃L P / Alt+L P, or pick **Show Symbol Palette** from the **TeX** status bar menu. The palette opens as a **LaTeX Symbols** tab in the bottom panel; drag the tab to the sidebar if you prefer it there. **TeX: Insert Symbol…** (⌃L . / Alt+L .) for the same list in a searchable picker. There are ten groups: Greek, Structures (fractions, roots, sums, delimiters, matrices, cases), Accents, Fonts, Relations, Operators, Arrows, Misc, Text and Blocks (figure, table, lists, equations, theorem, proof, frame). Search by name ("arrow", "matrix", "norm"); the symbols you used last appear at the top.
@@ -373,6 +423,9 @@ Click **✨** in the editor's title bar for the AI menu, or use the **LaTeX → 
 - **Write with AI…** writes LaTeX at the cursor from a description: a table, a figure, a TikZ diagram, an equation, a paragraph. If it needs a package the preamble doesn't load, you're offered to add it.
 - **Review with AI…** (⌃L V / Alt+L V) reads the selection, the section at the cursor or the whole file and leaves comments on what it would change, like a co-author or GitHub Copilot's review comments. See [Review comments](#review-comments-from-ai) below.
 - **Fix with AI** appears in the lightbulb on compile errors. The model sees the error and the lines around it, proposes the smallest fix and says why.
+- **Image to LaTeX…** turns a screenshot or photo of an equation, a table or notes into LaTeX at the cursor: pick an image file, right-click one in the Explorer, or paste an image and choose *Convert image to LaTeX with AI*. It needs a model that reads images (Copilot's, Claude, ChatGPT, or a vision model on your endpoint).
+
+<img src="docs/images/image-to-latex.png" alt="A pasted screenshot of two equations converted by AI into an equation* environment, and the same equations typeset in the PDF" width="720">
 
 <img src="docs/images/ai-rewrite.png" alt="Rewrite with AI changed &quot;classic&quot; to &quot;most familiar&quot;: the old word is struck through, the new one highlighted, with Accept and Reject" width="560">
 
@@ -413,6 +466,18 @@ AI review comments stay on your machine: they're not written to `.texreview` and
 | **ChatGPT** (your ChatGPT plan) | The [Codex CLI](https://github.com/openai/codex) installed and signed in (`codex login`). Requests run `codex exec` in a read-only sandbox. |
 | **OpenAI-compatible API** | Any server with `/chat/completions`: Ollama and LM Studio (local, nothing leaves your machine), OpenRouter, Groq, vLLM, OpenAI. Pick the endpoint and model; an API key, if needed, is kept in VS Code's secret storage. |
 
+#### Tools for AI agents
+
+In GitHub Copilot's agent mode (and other VS Code chat agents), the extension provides three tools the agent can call by itself, or you can mention with `#`:
+
+| Tool | What it does |
+|---|---|
+| `#compileLatex` | Saves and builds the project, and returns every error and warning with file and line, so the agent can fix them and build again. |
+| `#latexProject` | The main file, its files, packages and macros, the numbered outline, all labels and the bibliography keys, so new `\ref` and `\cite` commands point at things that exist. |
+| `#addReference` | Adds a paper by DOI or arXiv id to the `.bib` file (after you confirm) and returns its key. |
+
+For example: *"Build the thesis and fix the errors"*, or *"Add a related-work paragraph citing 1706.03762 and 10.1038/nature14539"*.
+
 ---
 
 ## Viewing the PDF
@@ -429,7 +494,7 @@ In the preview toolbar:
 - **−**, **Fit** and **+** zoom.
 - **⤓ PDF** downloads the PDF: in VS Code it asks where to save a copy (Downloads by default), in a browser it's a normal download. Also **TeX: Download PDF…**.
 
-The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompile, Stop, Open Preview, Open in Browser, Open in External Viewer, Download PDF, Jump to Location, Rewrite/Write with AI, Choose AI Provider, Word Count, Insert Symbol, Clean, Show Log.
+The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompile, Stop, Open Preview, Open in Browser, Open in External Viewer, Download PDF, Jump to Location, New LaTeX Project, Add Citation, Write/Rewrite/Review with AI, Image to LaTeX, AI Provider, spelling and grammar switches, Word Count, Symbols, Clean, Show Log.
 
 ![The live preview in a web browser, with the Sections menu open](docs/images/browser-preview.png)
 
@@ -598,6 +663,8 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX: Clean Auxiliary Files** | | | LaTeX right-click submenu |
 | **TeX: Show Compile Log** | | | TeX status bar menu |
 | **TeX: TeX Actions…** | | | Click **TeX** in the status bar |
+| **TeX: New LaTeX Project…** | | | TeX status bar menu; a folder's right-click menu |
+| **TeX: Install Tectonic (LaTeX compiler)** / **Check LaTeX Compiler** | | | Offered when no compiler is found; button in the preview |
 
 **Editing**
 
@@ -616,6 +683,7 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX: Insert Symbol…** | ⌃L . | Alt+L . |
 | **TeX: Show Symbol Palette** (also the operator icon in the editor title bar) | ⌃L P | Alt+L P |
 | **TeX: Count Words** | ⌃L ⌃C | Alt+L Alt+C |
+| **TeX: Add Citation (DOI, arXiv or Zotero)…** | ⌃L ⇧C | Alt+L Shift+C |
 | **TeX Review: Toggle Track Changes** | ⌃L R | Alt+L R |
 | Add comment (**Comments: Add Comment on Current Selection**) | ⌃L K | Alt+L K |
 | **TeX Review: Accept Change** / **Reject Change** | ⌃L A / ⌃L X | Alt+L A / Alt+L X |
@@ -635,6 +703,7 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX AI: Clear AI Review Comments** | LaTeX → AI submenu |
 | **TeX AI: Change AI Model…** | ✨ menu; LaTeX → AI submenu |
 | **TeX AI: Fix Compile Error with AI** | Lightbulb on a compile error; LaTeX → AI submenu |
+| **TeX AI: Image to LaTeX…** | ✨ menu; LaTeX → AI submenu; an image's right-click menu in the Explorer; the paste menu after pasting an image |
 | **TeX AI: Choose AI Provider…** | LaTeX → AI submenu; TeX status bar menu |
 | **TeX AI: Set API Key for OpenAI-compatible Endpoint…** | Command Palette |
 
@@ -736,4 +805,12 @@ Or open this folder in VS Code and press **F5** to start an Extension Developmen
 | `tools.js` | Finding and running external programs |
 | `synctex.js` | SyncTeX reader (PDF ↔ source positions) |
 | `overleaf.js` | Two-way Overleaf sync over Git |
+| `install.js` | One-click Tectonic install |
+| `templates.js` | **New LaTeX Project…** templates |
+| `cite.js` | **Add Citation…**: DOI, arXiv and Zotero |
+| `figures.js` | Pasting and dropping images and files |
+| `agent.js` | Language model tools for AI agents |
+| `ai.js`, `aireview.js` | AI writing help and AI review comments |
+| `proofing.js` | Spelling and grammar |
+| `rating.js` | The one-time rating request |
 | `media/viewer.js`, `media/viewer.css` | The PDF viewer inside the preview (pdf.js, text layer, links) |
