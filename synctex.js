@@ -19,6 +19,59 @@ function realpath(p) {
   }
 }
 
+// On Windows, TeX engines can write Input: paths in the system's ANSI code page (GBK on Chinese
+// Windows, Shift-JIS on Japanese…) rather than UTF-8. These are tried when a path isn't valid
+// UTF-8 or doesn't exist; a decoding only counts if the file it names exists.
+const FALLBACK_ENCODINGS = ['gb18030', 'big5', 'shift_jis', 'euc-kr', 'windows-1252', 'windows-1251', 'windows-1250'];
+
+function decoder(enc, fatal) {
+  try {
+    return new TextDecoder(enc, { fatal });
+  } catch {
+    return null; // not supported by this runtime's ICU
+  }
+}
+
+/**
+ * An Input: path from its raw bytes: UTF-8 if that names an existing file, else the first code
+ * page whose decoding does, else the longest tail of it that exists under `baseDir` (the folder
+ * names that couldn't be decoded are usually above the project), else lossy UTF-8.
+ */
+function decodePath(bytes, baseDir) {
+  const tried = [];
+  const exists = (p) => {
+    try {
+      return fs.statSync(p).isFile();
+    } catch {
+      return false;
+    }
+  };
+  for (const enc of ['utf-8', ...FALLBACK_ENCODINGS]) {
+    const d = decoder(enc, true);
+    if (!d) continue;
+    let text;
+    try {
+      text = d.decode(bytes);
+    } catch {
+      continue; // not valid in this encoding
+    }
+    const full = path.resolve(baseDir, text);
+    if (exists(full)) return full;
+    tried.push(text);
+    if (enc === 'utf-8' && !/[^\x00-\x7f]/.test(text)) break; // plain ASCII: no other decoding differs
+  }
+  const lossy = bytes.toString('utf8');
+  // Valid UTF-8 that names no file (built on another machine, a deleted file…) is kept as written,
+  // as before. Only bytes no listed encoding could read fall back to matching the path's tail.
+  if (tried.length && tried[0] === lossy) return path.resolve(baseDir, lossy);
+  const segs = lossy.split(/[\\/]+/).filter(Boolean);
+  for (let k = segs.length - 1; k >= 1; k--) {
+    const cand = path.join(baseDir, ...segs.slice(-k));
+    if (exists(cand)) return cand;
+  }
+  return path.resolve(baseDir, tried[0] || lossy);
+}
+
 class SyncTex {
   /** @param {string} file path to .synctex.gz or .synctex  @param {string} baseDir dir used to resolve relative Input paths */
   constructor(file, baseDir) {
@@ -26,7 +79,9 @@ class SyncTex {
     if (file.endsWith('.gz')) buf = zlib.gunzipSync(buf);
     this.inputs = new Map(); // tag -> absolute path
     this.pages = new Map(); // page number -> { boxes: [], leaves: [] }
-    this.parse(buf.toString('utf8'), baseDir);
+    // latin1 keeps one character per byte, so Input: paths can be re-read as raw bytes and
+    // decoded properly (everything else in the file is ASCII).
+    this.parse(buf.toString('latin1'), baseDir);
   }
 
   parse(text, baseDir) {
@@ -43,8 +98,8 @@ class SyncTex {
     for (const raw of lines) {
       const c = raw.charAt(0);
       if (c === 'I' && raw.startsWith('Input:')) {
-        const m = raw.match(/^Input:(\d+):(.*)$/);
-        if (m && m[2]) this.inputs.set(Number(m[1]), realpath(path.resolve(baseDir, m[2])));
+        const m = raw.match(/^Input:(\d+):(.*?)\r?$/); // `.` stops at \r, so allow CRLF files
+        if (m && m[2]) this.inputs.set(Number(m[1]), realpath(decodePath(Buffer.from(m[2], 'latin1'), baseDir)));
         continue;
       }
       if (!page) {

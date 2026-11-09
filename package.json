@@ -2,7 +2,7 @@
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview: LaTeX & Overleaf",
   "description": "Overleaf-style LaTeX in VS Code, Cursor and VSCodium: live PDF preview with SyncTeX, one-click compiler install, templates, citations from DOI/arXiv/Zotero, AI writing and review, comments and tracked changes, and two-way Overleaf sync.",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {

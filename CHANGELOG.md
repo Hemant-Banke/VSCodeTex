@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.1
+- SyncTeX (Jump to Location in PDF, double-click in the PDF) works for projects whose folder or file names have non-ASCII characters on Windows, where TeX writes the paths in the system code page (GBK, Big5, Shift-JIS…) instead of UTF-8 ([#1](https://github.com/Hemant-Banke/VSCodeTex/issues/1)).
+
 ## 1.4.0
 - **No TeX? One click.** When no compiler is found, the extension offers to install Tectonic 0.17.0 (about 20 MB, checksum-verified, kept in the extension's storage); also **TeX: Install Tectonic** and a button in the preview.
 - **TeX: New LaTeX Project…**: article, thesis (chapters in their own files), Beamer, CV, homework, letter, IEEE and ACM templates that build out of the box.
