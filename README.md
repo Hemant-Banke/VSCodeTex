@@ -64,12 +64,13 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 | 🌐 **Browser and external viewers** | The same live preview in a browser tab, or the PDF in your own viewer. |
 | 🚨 **Clickable errors** | Listed above the PDF and in the Problems panel, in the right file and line; the last good PDF stays visible. |
 | 📦 **No TeX? No problem** | One click installs Tectonic, a small self-contained LaTeX engine, just for this extension. |
+| ⚙️ **pdfLaTeX, XeLaTeX or LuaLaTeX** | Pick the program from the status bar, for one document (`% !TEX program`) or the whole workspace. |
 
 **Writing**
 
 | | |
 |---|---|
-| 🆕 **Project templates** | Article, thesis with chapters, Beamer slides, CV, homework, letter, IEEE and ACM papers, ready to build. |
+| 🆕 **Project templates** | Article, thesis with chapters, Beamer slides, CV, homework, letter, IEEE and ACM papers, and Chinese article, thesis, slides and CV, ready to build. |
 | 📚 **Citations from a DOI, arXiv or Zotero** | Paste a DOI or arXiv link (or pick in Zotero): the BibTeX goes into your `.bib` file and `\cite{…}` at the cursor. |
 | 🖼️ **Paste and drop images** | Paste a screenshot to save it under `figures/` as a captioned figure; drop images or `.tex` files from the Explorer. |
 | 💡 **Suggestions** | `\cite` keys, `\ref` labels with their numbers, 220+ commands with their symbols, environments, files and packages. |
@@ -78,6 +79,7 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 | ✍️ **Editing keys** | Bold, italic, inline math, surround with a command or environment, promote/demote headings, `\item` lists. |
 | 🗂️ **Outline** | Headings numbered as in the PDF, plus figures, tables and theorems; folding and Expand Selection. |
 | 🔤 **Spelling and grammar** | Offline spell check that skips math, commands and citations; optional grammar checks with LanguageTool. |
+| 🀄 **Chinese documents** | Common typos (错别字), Chinese punctuation checks, Chinese grammar checks, CJK word counts, missing-font fixes and GB/T 7714 references. |
 | ✨ **AI writing help** | Rewrite a passage, write LaTeX at the cursor, turn a screenshot of an equation or table into LaTeX, get review comments with suggested changes, or fix a compile error, with Copilot, your Claude or ChatGPT subscription, or any open model. Results arrive as tracked changes. |
 | 🤖 **Tools for AI agents** | Copilot's agent mode can build your project and read its errors, see its outline, labels and references, and add references by DOI, so it can fix a paper the way it fixes code. |
 | 🧹 **Format, lint and count** | Format Document for `.tex` and `.bib`, duplicate-label warnings, optional ChkTeX, and a word count in the status bar. |
@@ -102,8 +104,9 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 - Clickable links in the PDF, text selection and copy, zoom (buttons, Fit, ⌘/Ctrl + wheel).
 - Errors listed above the PDF and in the Problems panel; the last good PDF stays visible.
 - latexmk, tectonic, pdflatex, xelatex or lualatex (with BibTeX); your own build command; Docker; knitr/Weave.
+- The TeX program (pdfLaTeX, XeLaTeX, LuaLaTeX) in the status bar: pick it per document (`% !TEX program = xelatex`) or per workspace.
 - No TeX installed: **TeX: Install Tectonic** downloads a pinned, checksum-verified Tectonic for the extension's own use (also offered when no compiler is found).
-- **TeX: New LaTeX Project…** with eight templates that build out of the box.
+- **TeX: New LaTeX Project…** with twelve templates that build out of the box, four of them Chinese (ctex, XeLaTeX, GB/T 7714).
 - Stop a compile, clean auxiliary files, show the full log; **TeX** status bar menu for all of these.
 - Main file found automatically (or via `% !TEX root`); `\input`, `\include`, `\subfile` and `\import` followed.
 - Two-way Overleaf sync over Git, with conflicts resolved in VS Code's merge editor.
@@ -128,7 +131,8 @@ To work with co-authors on Overleaf, run **Overleaf: Clone Project…** ([detail
 **Navigating and checking**
 - Outline, breadcrumbs and Go to Symbol with numbered headings (1, 1.2, A for appendices) across all files, plus figures, tables, theorems, frames, abstract and references.
 - Folding for sections, environments, comment blocks and `% region` markers; Expand Selection through math and environments; linked `\begin`/`\end` renaming.
-- Word count in the status bar (and for the selection); details with characters, formulas and a per-file breakdown.
+- Word count in the status bar (and for the selection); details with characters, formulas and a per-file breakdown. Chinese, Japanese and Korean characters are counted one by one.
+- Chinese text: common-typo checks (错别字), punctuation and spacing checks with fixes, Chinese grammar checks through LanguageTool, and quick fixes for missing Chinese fonts.
 - Format Document for `.tex` (latexindent or built-in) and `.bib`; duplicate-label warnings; optional ChkTeX linting.
 - Works in Remote SSH, WSL and Dev Containers.
 
@@ -217,6 +221,10 @@ Put the cursor on a line and press **⌥⌘J** (Ctrl+Alt+J), or right-click → 
 
 ![The displayed formula from line 52 highlighted in yellow in the PDF](docs/images/forward-search.png)
 
+Two-column layouts (IEEEtran, `\documentclass[twocolumn]`…) work the same way: the highlight lands on the line, in whichever column it was typeset.
+
+![Forward search in a two-column IEEE paper: one line highlighted in the right-hand column](docs/images/forward-search-2col.png)
+
 ### Clickable links
 
 Hyperlinks in the PDF work like in a PDF viewer. `\ref`, `\eqref`, `\cite`, table-of-contents and footnote links scroll to their target inside the preview, and `\url`/`\href` links open in your browser. Hovering a link outlines it.
@@ -296,6 +304,14 @@ All of this works in `.tex` files with no setup, and it reads the whole project:
 | Letter | The `letter` class |
 | IEEE conference paper | `IEEEtran` (conference) |
 | ACM conference paper | `acmart` (sigconf) |
+| Chinese article · 中文论文 | `ctexart` with XeLaTeX and GB/T 7714 references |
+| Chinese thesis · 中文学位论文 | `ctexbook`: title page, 摘要 / Abstract, 目录, one file per chapter, 参考文献 (GB/T 7714), 致谢 |
+| Chinese slides · 中文幻灯片 | `ctexbeamer`, 16:9 |
+| Chinese CV · 中文简历 | One page, `ctexart` |
+
+The Chinese templates start with `% !TEX program = xelatex` and leave ctex to pick fonts that exist on the computer that builds them.
+
+<img src="docs/images/new-project-zh.png" alt="The template picker filtered to the Chinese templates: CV, article, slides and thesis" width="49%"> <img src="docs/images/zh-template.png" alt="The Chinese article template beside its PDF: 论文题目, 摘要, 引言 with a GB/T 7714 citation, 方法" width="49%">
 
 ### Citations from a DOI, arXiv or Zotero
 
@@ -383,7 +399,7 @@ All of these work with several cursors. They use ⌃L on macOS and Alt+L on Wind
 
 **Lists:** pressing Enter at the end of an `\item` line starts the next `\item`. Pressing Enter on an empty `\item` removes it and steps out of the list.
 
-**Word count:** the status bar shows the project's word count while a LaTeX file is open, or *"120 of 8,314 words"* when text is selected. Click it for characters (with and without spaces), the number of formulas and a count for each file. Math, commands and comments aren't counted as words.
+**Word count:** the status bar shows the project's word count while a LaTeX file is open, or *"120 of 8,314 words"* when text is selected. Chinese, Japanese and Korean characters are counted one by one (*"5,678 CJK · 120 words"*). Click it for characters (with and without spaces), the number of formulas and a count for each file. Math, commands and comments aren't counted as words.
 
 ![The word count details: words, characters and formulas](docs/images/word-count.png)
 
@@ -399,7 +415,9 @@ All of these work with several cursors. They use ⌃L on macOS and Alt+L on Wind
 
 <img src="docs/images/spell-suggestions.png" alt="Spelling and Grammar Suggestions on a misspelt word: Change to &quot;temperature&quot; and Add to dictionary" width="49%"> <img src="docs/images/grammar-hover.png" alt="A LanguageTool grammar issue: Did you mean &quot;faster than&quot;?" width="49%">
 
-**On and off:** right-click → **LaTeX → Spelling and Grammar** has *Spell Check* and *Grammar Check* switches (with a checkmark when on) and *Spelling Language…*; the same switches are in the **TeX** status bar menu.
+**On and off:** right-click → **LaTeX → Spelling and Grammar** shows *Spell Check: On ✓* or *Off* (and the same for *Grammar Check*, and *Chinese Typography Check* in files with Chinese text); click to switch. *Spelling Language…* is there too, and the same switches are in the **TeX** status bar menu.
+
+![Right-click → LaTeX → Spelling and Grammar: Spell Check: On ✓, Grammar Check (LanguageTool): Off, Chinese Typography Check: On ✓](docs/images/menu-toggles.png)
 
 - **Language:** `texPreview.spellcheck.language` is `en-US` or `en-GB` (both bundled), the name of a Hunspell dictionary installed on your machine (`de_DE`, `fr_FR`, … from `~/Library/Spelling`, `/usr/share/hunspell` and similar), or the path of a `.dic` file. A file can pick its own with `% !TeX spellcheck = en_GB` in its first lines.
 - **Off:** set `texPreview.spellcheck.enabled` to `false`, for example if you use another spell-check extension.
@@ -408,6 +426,26 @@ All of these work with several cursors. They use ⌃L on macOS and Alt+L on Wind
 
 - **Privacy:** by default the text goes to LanguageTool's public API (free, about 20 checks a minute). To keep it on your machine, run a local server, e.g. `docker run -p 8010:8010 erikvl87/languagetool`, and set `texPreview.grammar.server` to `http://localhost:8010`.
 - **Premium:** set `texPreview.grammar.username` and run **TeX: Set LanguageTool Premium API Key…**.
+
+### Chinese documents
+
+Everything below happens only in text that has Chinese (or Japanese) characters in it; other documents never see it.
+
+<img src="docs/images/chinese-typo.png" alt="Quick fix on 再接再励: Change to 再接再厉" width="49%"> <img src="docs/images/chinese-typography.png" alt="Quick fix on a half-width comma in Chinese text: Change to ，, Fix all Chinese typography issues in this file" width="49%">
+
+- **Common typos (错别字):** Chinese has no spaces between words, so instead of a word dictionary, Chinese text is checked against a list of phrases that are always wrong, such as 再接再~~励~~厉, 一~~股~~鼓作气, ~~阀~~阈值, ~~截止~~截至目前. They get a squiggle with a one-click fix, whatever the spelling language is. English words in the same document are still spell checked.
+- **Grammar:** with grammar checks on, mostly-Chinese paragraphs go to LanguageTool as Chinese (`zh-CN`), which catches 的 / 地 / 得 mistakes and more typos; English paragraphs are checked as English.
+- **Typography:** half-width `,` `.` `;` `:` `?` `!` in Chinese sentences (→ `，。；：？！`), straight quotes (→ `“ ”`), `...` (→ `……`), doubled marks (`，，`, `的的`) and stray spaces next to full-width punctuation get a quiet hint with a fix, and **Fix all Chinese typography issues in this file**. Numbers such as `3.14` and `1,000` are left alone. Turn it off with *Chinese Typography Check* in the Spelling and Grammar menu (`texPreview.chinese.typography`).
+- **Word count** counts each Chinese, Japanese or Korean character as one, next to the English words: *"5,678 CJK · 120 words"*.
+
+  ![The status bar: TeX, ⚙ XeLaTeX and "78 CJK · 11 words"](docs/images/status-cjk.png)
+- **Compiler:** pick XeLaTeX for the document from the status bar (it adds `% !TEX program = xelatex`). A pdfLaTeX build that fails on `ctex`, `xeCJK` or `fontspec` offers to switch.
+- **Fonts:** when a build fails with *The font "SimSun" cannot be found* (a Windows font on a Mac, for example), the error is explained on the line that chose the font, with quick fixes: ctex's `fontset=` for this computer, `fontset=fandol` (fonts included with TeX), or this system's equivalent font (SimSun → Songti SC, …). On macOS some Chinese fonts are downloaded the first time they're used, so a first build can fail once and then work.
+
+  ![A missing SimSun font explained above the PDF and on the \documentclass line, with quick fixes: Use ctex fontset=mac, Use ctex fontset=fandol, Remove fontset=](docs/images/font-fix.png)
+- **References:** **Add Citation** sets up GB/T 7714-2015 (`gbt7714`) in Chinese documents, and `\bibliographystyle{` suggests `gbt7714-numerical` and `gbt7714-author-year`.
+- **Templates:** **TeX: New LaTeX Project…** has a Chinese article, thesis, slides and CV (see [New project from a template](#new-project-from-a-template)).
+- **Chinese punctuation isn't boxed:** VS Code normally boxes `，；：？！（）` as "looks like ASCII" when the system language isn't Chinese; in `.tex` and `.bib` files it doesn't.
 
 ### AI writing help
 
@@ -494,7 +532,7 @@ In the preview toolbar:
 - **−**, **Fit** and **+** zoom.
 - **⤓ PDF** downloads the PDF: in VS Code it asks where to save a copy (Downloads by default), in a browser it's a normal download. Also **TeX: Download PDF…**.
 
-The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompile, Stop, Open Preview, Open in Browser, Open in External Viewer, Download PDF, Jump to Location, New LaTeX Project, Add Citation, Write/Rewrite/Review with AI, Image to LaTeX, AI Provider, spelling and grammar switches, Word Count, Symbols, Clean, Show Log.
+The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompile, Stop, Open Preview, Open in Browser, Open in External Viewer, Download PDF, Jump to Location, TeX Program, New LaTeX Project, Add Citation, Write/Rewrite/Review with AI, Image to LaTeX, AI Provider, spelling and grammar switches, Word Count, Symbols, Clean, Show Log.
 
 ![The live preview in a web browser, with the Sections menu open](docs/images/browser-preview.png)
 
@@ -506,10 +544,15 @@ The **TeX** item in the status bar (shown for LaTeX files) opens a menu: Recompi
 
 | Need | How |
 |---|---|
+| Switch between pdfLaTeX, XeLaTeX and LuaLaTeX | Click the **⚙ pdfLaTeX** item in the status bar (or **TeX: Select TeX Program…**). Pick it for *this document*, which adds `% !TEX program = xelatex` to the top of the main file, or as the *workspace default*. A document's choice wins, so English and Chinese papers can sit side by side. latexmk runs it with `-pdf` / `-xelatex` / `-lualatex`. |
 | Stop a long compile | **TeX: Stop Compiling** |
 | Remove `.aux`, `.log`, `.synctex.gz` and similar files | **TeX: Clean Auxiliary Files**. The PDF is kept. |
 | Use your own build | Set `texPreview.buildCommand`, e.g. `latexmk -pdf -outdir=%OUTDIR% %DOC%`. Errors and SyncTeX work as usual. |
 | Build with no local TeX install | Set `texPreview.docker.image`, e.g. `texlive/texlive`. The compiler runs in that container. |
+
+The status bar shows the program the open document builds with, next to the **TeX** menu; click it to change. The ✓ marks the current choice, and each program says what will run it (latexmk, Tectonic, or the program itself), with a ⚠ if it isn't installed:
+
+![The TeX Program picker: pdfLaTeX, XeLaTeX (checked) and LuaLaTeX for this document, and Automatic or a program as the workspace default](docs/images/program-picker.png)
 | Knitr or Weave documents | `.rnw` files are knitted with `Rscript` and `.jnw` files are woven with Julia before compiling. |
 | Main file without a magic comment | Found automatically: a file without `\documentclass` is built through the file that `\input`s it. |
 | Remote SSH, WSL, Dev Containers | The extension runs where your files are, so it uses the TeX installation there. |
@@ -664,6 +707,7 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX: Show Compile Log** | | | TeX status bar menu |
 | **TeX: TeX Actions…** | | | Click **TeX** in the status bar |
 | **TeX: New LaTeX Project…** | | | TeX status bar menu; a folder's right-click menu |
+| **TeX: Select TeX Program (pdfLaTeX / XeLaTeX / LuaLaTeX)…** | | | Click the program in the status bar; TeX status bar menu; title-bar `···` menu |
 | **TeX: Install Tectonic (LaTeX compiler)** / **Check LaTeX Compiler** | | | Offered when no compiler is found; button in the preview |
 
 **Editing**
@@ -683,6 +727,7 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | **TeX: Insert Symbol…** | ⌃L . | Alt+L . |
 | **TeX: Show Symbol Palette** (also the operator icon in the editor title bar) | ⌃L P | Alt+L P |
 | **TeX: Count Words** | ⌃L ⌃C | Alt+L Alt+C |
+| **TeX: Fix All Chinese Typography Issues in File** (files with Chinese text) | | |
 | **TeX: Add Citation (DOI, arXiv or Zotero)…** | ⌃L ⇧C | Alt+L Shift+C |
 | **TeX Review: Toggle Track Changes** | ⌃L R | Alt+L R |
 | Add comment (**Comments: Add Comment on Current Selection**) | ⌃L K | Alt+L K |
@@ -738,7 +783,8 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | Setting | Default | Description |
 |---|---|---|
 | `texPreview.engine` | `auto` | `auto`, `latexmk`, `tectonic`, `pdflatex`, `xelatex` or `lualatex`. `auto` uses the first of latexmk, tectonic and pdflatex that's installed. |
-| `texPreview.latexmkEngine` | `pdf` | What latexmk runs: `pdf`, `xelatex` or `lualatex`. |
+| `texPreview.program` | `auto` | TeX program for the workspace: `auto`, `pdflatex`, `xelatex` or `lualatex`. A `% !TEX program = …` line in the main file wins over it. `auto` leaves it to `engine` and `latexmkEngine`. |
+| `texPreview.latexmkEngine` | `pdf` | What latexmk runs when `texPreview.program` is `auto` and there's no `% !TEX program` line: `pdf`, `xelatex` or `lualatex`. |
 | `texPreview.outDir` | `.texbuild` | Where the PDF and auxiliary files go, relative to the main `.tex` file. Use `.` to build next to the source. |
 | `texPreview.compileOnSave` | `true` | Recompile when a `.tex`/`.bib`/`.sty`/`.cls` file is saved. |
 | `texPreview.extraPath` | `[]` | Extra folders to search for TeX programs. |
@@ -750,6 +796,7 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 | `texPreview.spellcheck.enabled` | `true` | Check spelling as you type, offline. |
 | `texPreview.spellcheck.language` | `en-US` | `en-US`, `en-GB`, an installed Hunspell dictionary name (`de_DE`) or a `.dic` path. Also used for grammar. |
 | `texPreview.spellcheck.words` | `[]` | Words to accept (user and workspace lists are combined). |
+| `texPreview.chinese.typography` | `true` | Check Chinese punctuation and spacing, only in text with Chinese characters. |
 | `texPreview.grammar.enabled` | `false` | Check grammar with LanguageTool. Sends the prose of open files to the server. |
 | `texPreview.grammar.server` | `https://api.languagetool.org` | LanguageTool server, e.g. `http://localhost:8010` for a local one. |
 | `texPreview.grammar.username` | `""` | LanguageTool Premium username, used with the API key. |
@@ -774,6 +821,8 @@ Every command is in the Command Palette (⇧⌘P / Ctrl+Shift+P) under **TeX:** 
 **The first compile with tectonic is slow.** Tectonic downloads the packages your document uses the first time; later compiles take seconds.
 
 **A missing image or `.bib` file stops the build.** Check that every file the document references is in the project folder. Click the error above the PDF to go to the line that references it.
+
+**The font "SimSun" (or another Chinese font) cannot be found.** The document asks for a font this computer doesn't have. Use the quick fix on the error (💡), or with ctex remove `fontset=…` so it picks this system's fonts, or use `fontset=fandol`.
 
 **Overleaf says the token was rejected.** Create a new token on overleaf.com and run **Overleaf: Set Git Token…**. Overleaf's Git integration requires a plan that includes it.
 
@@ -812,5 +861,6 @@ Or open this folder in VS Code and press **F5** to start an Extension Developmen
 | `agent.js` | Language model tools for AI agents |
 | `ai.js`, `aireview.js` | AI writing help and AI review comments |
 | `proofing.js` | Spelling and grammar |
+| `chinese.js` | Chinese typos, typography, grammar language and missing-font help |
 | `rating.js` | The one-time rating request |
 | `media/viewer.js`, `media/viewer.css` | The PDF viewer inside the preview (pdf.js, text layer, links) |

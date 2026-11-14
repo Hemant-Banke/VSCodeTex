@@ -355,16 +355,29 @@ function fileStats(file, bodyOnly) {
 }
 
 function projectStats(doc) {
-  const add = (a, b) => ({ words: a.words + b.words, chars: a.chars + b.chars, charsNoSpaces: a.charsNoSpaces + b.charsNoSpaces, inlineMath: a.inlineMath + b.inlineMath, displayMath: a.displayMath + b.displayMath });
+  const add = (a, b) => ({ words: a.words + b.words, cjk: a.cjk + b.cjk, chars: a.chars + b.chars, charsNoSpaces: a.charsNoSpaces + b.charsNoSpaces, inlineMath: a.inlineMath + b.inlineMath, displayMath: a.displayMath + b.displayMath });
   if (doc.uri.scheme !== 'file') return { total: textStats(doc.getText(), true), files: [] };
   const root = project.findRoot(doc.uri.fsPath);
   const files = project.projectFiles(root).map((f) => ({ file: f, stats: fileStats(f, f === root) }));
-  return { root, total: files.reduce((a, f) => add(a, f.stats), { words: 0, chars: 0, charsNoSpaces: 0, inlineMath: 0, displayMath: 0 }), files };
+  return { root, total: files.reduce((a, f) => add(a, f.stats), { words: 0, cjk: 0, chars: 0, charsNoSpaces: 0, inlineMath: 0, displayMath: 0 }), files };
 }
 
 function selectionStats(editor) {
   if (editor.selections.every((s) => s.isEmpty)) return null;
-  return editor.selections.reduce((sum, s) => sum + countWords(editor.document.getText(s), false), 0);
+  return editor.selections.reduce(
+    (sum, s) => {
+      const c = countWords(editor.document.getText(s), false);
+      return { words: sum.words + c.words, cjk: sum.cjk + c.cjk };
+    },
+    { words: 0, cjk: 0 }
+  );
+}
+
+/** "1,234 words", or with CJK text "5,678 CJK characters · 1,234 words" (CJK first: it's the bulk). */
+function countLabel({ words, cjk }, short) {
+  const w = `${words.toLocaleString()} word${words === 1 ? '' : 's'}`;
+  if (!cjk) return w;
+  return `${cjk.toLocaleString()} ${short ? 'CJK' : 'CJK characters'}${words ? ` · ${w}` : ''}`;
 }
 
 function wordCountStatus(context) {
@@ -385,8 +398,13 @@ function wordCountStatus(context) {
     }
     const { total } = lastTotal;
     const sel = selectionStats(ed);
-    item.text = sel !== null ? `${sel.toLocaleString()} of ${total.words.toLocaleString()} words` : `${total.words.toLocaleString()} words`;
-    item.tooltip = `${total.words.toLocaleString()} words · ${total.chars.toLocaleString()} characters (${total.charsNoSpaces.toLocaleString()} without spaces)\nText only: math, commands and comments are not counted.\nClick for details.`;
+    if (sel === null) item.text = countLabel(total, true);
+    else if (!total.cjk) item.text = `${sel.words.toLocaleString()} of ${total.words.toLocaleString()} words`;
+    else item.text = `${countLabel(sel, true)} selected`;
+    item.tooltip =
+      `${countLabel(total)} · ${total.chars.toLocaleString()} characters (${total.charsNoSpaces.toLocaleString()} without spaces)\n` +
+      (total.cjk ? `Each Chinese, Japanese or Korean character counts as one; ${(total.cjk + total.words).toLocaleString()} in all, counted the way Word does.\n` : '') +
+      'Text only: math, commands and comments are not counted.\nClick for details.';
     item.show();
   };
   const later = (ms) => {
@@ -413,15 +431,16 @@ async function wordCount() {
   const n = (x) => x.toLocaleString();
   const items = [];
   const sel = selectionStats(editor);
-  if (sel !== null) items.push({ label: `$(selection) ${n(sel)} words selected` });
+  if (sel !== null) items.push({ label: `$(selection) ${countLabel(sel)} selected` });
   items.push(
+    ...(total.cjk ? [{ label: `$(symbol-key) ${n(total.cjk)} CJK characters`, description: `each counts as one; ${n(total.cjk + total.words)} with the words, as Word counts` }] : []),
     { label: `$(book) ${n(total.words)} words`, description: root ? path.basename(root) + (files.length > 1 ? ` and ${files.length - 1} included file${files.length > 2 ? 's' : ''}` : '') : '' },
     { label: `$(symbol-text) ${n(total.chars)} characters`, description: `${n(total.charsNoSpaces)} without spaces` },
     { label: `$(symbol-operator) ${n(total.inlineMath)} inline formulas, ${n(total.displayMath)} displayed`, description: 'not counted as words' }
   );
   if (files.length > 1) {
     items.push({ label: 'By file', kind: vscode.QuickPickItemKind.Separator });
-    for (const f of files) items.push({ label: `$(file) ${path.relative(path.dirname(root), f.file)}`, description: `${n(f.stats.words)} words · ${n(f.stats.chars)} characters`, file: f.file });
+    for (const f of files) items.push({ label: `$(file) ${path.relative(path.dirname(root), f.file)}`, description: `${countLabel(f.stats)} · ${n(f.stats.chars)} characters`, file: f.file });
   }
   const picked = await vscode.window.showQuickPick(items, { title: 'Word Count', placeHolder: 'Text only: math, commands and comments are not counted' });
   if (picked && picked.file) vscode.window.showTextDocument(vscode.Uri.file(picked.file));

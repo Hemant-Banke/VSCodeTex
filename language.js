@@ -19,6 +19,23 @@ const REF = /\\(?:ref|eqref|pageref|autoref|nameref|vref|cref|Cref|cpageref|Cpag
 const ENV = /\\(begin|end)\s*\{([^}]*)$/;
 const FILE = /\\(input|include|subfile|includegraphics|bibliography|addbibresource|includeonly|includepdf|lstinputlisting|includestandalone)\*?\s*(?:\[[^\]]*\]\s*)?\{([^}]*)$/;
 const PKG = /\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\]\s*)?\{([^}]*)$/;
+const BIBSTYLE = /\\bibliographystyle\s*\{([^}]*)$/;
+const BIB_STYLES = [
+  ['plain', 'Numbered, sorted by author'],
+  ['unsrt', 'Numbered in order of citation'],
+  ['alpha', 'Labels like [Knu84]'],
+  ['abbrv', 'Like plain, abbreviated names'],
+  ['plainnat', 'natbib: numbers or author–year'],
+  ['unsrtnat', 'natbib: in order of citation'],
+  ['abbrvnat', 'natbib: abbreviated names'],
+  ['IEEEtran', 'IEEE'],
+  ['ACM-Reference-Format', 'ACM (acmart)'],
+  ['apalike', 'APA-like author–year'],
+  ['siam', 'SIAM'],
+  ['ieeetr', 'IEEE Transactions (classic)'],
+  ['gbt7714-numerical', 'GB/T 7714-2015 numbered, for Chinese journals and theses (\\usepackage{gbt7714})'],
+  ['gbt7714-author-year', 'GB/T 7714-2015 author–year (\\usepackage{gbt7714})'],
+];
 const IMAGE_EXT = ['.pdf', '.png', '.jpg', '.jpeg', '.eps', '.svg', '.gif'];
 
 /** TeX with plain backslashes → VS Code snippet syntax ($1 / ${1:…} stay placeholders, other $ are literal). */
@@ -67,6 +84,7 @@ class CompletionProvider {
     if ((m = before.match(ENV))) return this.envs(doc, pos, m[1], m[2], file);
     if ((m = before.match(FILE)) && file) return this.files(doc, pos, m[1], m[2], file);
     if ((m = before.match(PKG))) return this.packages(doc, pos, m[1]);
+    if ((m = before.match(BIBSTYLE))) return this.bibStyles(doc, pos, m[1]);
     if ((m = before.match(/\\([a-zA-Z]*)$/)) && !/\\\\[a-zA-Z]*$/.test(before)) return this.commands(doc, pos, m[1], file);
     if ((m = before.match(/(?:^|[^\\a-zA-Z0-9@])@([a-zA-Z]{0,2}|[^\sa-zA-Z])$/))) return this.at(pos, m[1]);
     // Ask again on every keystroke while an uppercase shortcut (BEQ, FIT, …) may still be forming.
@@ -171,6 +189,16 @@ class CompletionProvider {
     return PACKAGES.map(([name, desc]) => {
       const item = new vscode.CompletionItem({ label: name, description: desc }, vscode.CompletionItemKind.Module);
       item.range = range;
+      return item;
+    });
+  }
+
+  bibStyles(doc, pos, typed) {
+    const range = argRange(doc, pos, typed);
+    return BIB_STYLES.map(([name, desc], i) => {
+      const item = new vscode.CompletionItem({ label: name, description: desc }, vscode.CompletionItemKind.EnumMember);
+      item.range = range;
+      item.sortText = String(i).padStart(3, '0');
       return item;
     });
   }

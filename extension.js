@@ -24,12 +24,14 @@ const templates = require('./templates');
 const cite = require('./cite');
 const figures = require('./figures');
 const agent = require('./agent');
+const chinese = require('./chinese');
 
 /** @type {Map<string, Preview>} keyed by root .tex fsPath */
 const previews = new Map();
 let output;
 let diagnostics;
 let statusItem;
+let programItem; // the TeX program (pdfLaTeX / XeLaTeX / LuaLaTeX), next to statusItem
 let extensionUri;
 let browserServer;
 let offeredInstall = false;
@@ -45,12 +47,16 @@ function activate(context) {
   diagnostics = vscode.languages.createDiagnosticCollection('tex-preview');
   statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   statusItem.command = 'texPreview.menu';
+  programItem = vscode.window.createStatusBarItem('texPreview.program', vscode.StatusBarAlignment.Left, 99);
+  programItem.name = 'TeX Program';
+  programItem.command = 'texPreview.selectProgram';
   browserServer = new BrowserServer(context.extensionPath);
 
   context.subscriptions.push(
     output,
     diagnostics,
     statusItem,
+    programItem,
     vscode.commands.registerCommand('texPreview.open', (uri) => openPreview(uri)),
     vscode.commands.registerCommand('texPreview.compile', () => compileActive()),
     vscode.commands.registerCommand('texPreview.showLog', () => output.show(true)),
@@ -63,6 +69,7 @@ function activate(context) {
       return p ? openInBrowser(p, !opts || opts.launch !== false) : undefined;
     }),
     vscode.commands.registerCommand('texPreview.menu', () => showMenu()),
+    vscode.commands.registerCommand('texPreview.selectProgram', () => selectProgram()),
     vscode.commands.registerCommand('texPreview.copyText', async (text) => {
       if (typeof text !== 'string') return;
       await vscode.env.clipboard.writeText(text);
@@ -75,11 +82,17 @@ function activate(context) {
       if (tex && !statusItem.text) setStatus('$(file-pdf) TeX', 'TeX: preview, build and PDF actions');
       else if (!tex && ed && !previews.size) statusItem.hide();
       else if (tex) statusItem.show();
+      updateProgramItem();
     }),
     { dispose: () => browserServer.dispose() },
     vscode.workspace.onDidSaveTextDocument(onSave),
+    // A saved root may have gained or lost its % !TEX program comment.
+    vscode.workspace.onDidSaveTextDocument((doc) => doc === vscode.window.activeTextEditor?.document && updateProgramItem()),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('texPreview.invertPdf')) for (const p of previews.values()) p.sendConfig();
+      if (['program', 'engine', 'latexmkEngine', 'buildCommand', 'docker.image', 'extraPath'].some((k) => e.affectsConfiguration(`texPreview.${k}`))) {
+        updateProgramItem();
+      }
     }),
     vscode.window.onDidChangeActiveColorTheme(() => {
       for (const p of previews.values()) p.sendConfig();
@@ -89,7 +102,8 @@ function activate(context) {
     vscode.languages.registerDocumentSymbolProvider(LATEX, new structure.SymbolProvider()),
     vscode.languages.registerFoldingRangeProvider(LATEX, new structure.FoldingProvider()),
     vscode.languages.registerSelectionRangeProvider(LATEX, new structure.SelectionProvider()),
-    vscode.languages.registerLinkedEditingRangeProvider(LATEX, new structure.LinkedEditingProvider())
+    vscode.languages.registerLinkedEditingRangeProvider(LATEX, new structure.LinkedEditingProvider()),
+    vscode.languages.registerCodeActionsProvider(LATEX, new FontActions(), { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] })
   );
   installer.activate(context);
   rating.activate(context);
@@ -106,6 +120,7 @@ function activate(context) {
   review.activate(context, { onLogWritten: (uris) => overleaf.scheduleFor(uris) }).catch((e) => output.appendLine(`[review] ${e.stack || e}`));
   const ed = vscode.window.activeTextEditor;
   if (ed && /^(la)?tex$/.test(ed.document.languageId)) setStatus('$(file-pdf) TeX', 'TeX: preview, build and PDF actions');
+  updateProgramItem();
 
   // Changes pulled from Overleaf don't fire save events, so recompile affected previews here.
   overleaf.activate(context, {
@@ -259,6 +274,7 @@ async function showMenu() {
     { label: '$(file-pdf) Open PDF in External Viewer', command: 'texPreview.openExternal' },
     { label: '$(cloud-download) Download PDF…', command: 'texPreview.downloadPdf' },
     { label: '$(go-to-file) Jump to Location in PDF', command: 'texPreview.syncToPdf' },
+    { label: '$(gear) TeX Program…', description: 'pdfLaTeX, XeLaTeX or LuaLaTeX', command: 'texPreview.selectProgram' },
     { label: '$(cloud-download) Install Tectonic (LaTeX compiler)…', description: 'no compiler was found', command: 'texPreview.installTectonic', hide: !!installer.findCompiler() },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     { label: '$(new-folder) New LaTeX Project…', description: 'article, thesis, slides, CV, IEEE, ACM…', command: 'texPreview.newProject' },
@@ -383,16 +399,223 @@ function onSave(doc) {
 // ---------------------------------------------------------------------------
 // Tool discovery
 
-function pickEngine(PATH, docker) {
-  const wanted = vscode.workspace.getConfiguration('texPreview').get('engine') || 'auto';
+const PROGRAM_LABEL = { pdflatex: 'pdfLaTeX', xelatex: 'XeLaTeX', lualatex: 'LuaLaTeX' };
+const LATEXMK_MODE = { pdflatex: 'pdf', xelatex: 'xelatex', lualatex: 'lualatex' };
+const MODE_PROGRAM = { pdf: 'pdflatex', xelatex: 'xelatex', lualatex: 'lualatex' };
+
+/**
+ * The TeX program asked for `root`: a `% !TEX program` comment, else texPreview.program, else
+ * none (texPreview.engine / latexmkEngine decide, as before this setting existed).
+ */
+function wantedProgram(root) {
+  const magic = root ? project.magicProgram(root) : null;
+  if (magic && PROGRAM_LABEL[magic.program]) return { program: magic.program, source: 'magic' };
+  const set = vscode.workspace.getConfiguration('texPreview').get('program');
+  if (PROGRAM_LABEL[set]) return { program: set, source: 'setting' };
+  return { program: null, source: 'auto' };
+}
+
+/**
+ * What a build of `root` runs: { name, bin, program, source, note }. `name` is the tool
+ * (latexmk, tectonic or a TeX program run directly); `program` is the TeX program it ends up
+ * using; `note` explains when the program asked for can't be used. `override` replaces the
+ * program asked for (the picker uses it to preview each choice).
+ */
+function pickEngine(PATH, docker, root, override) {
+  const cfg = vscode.workspace.getConfiguration('texPreview');
+  const wanted = cfg.get('engine') || 'auto';
+  const asked = override ? { program: override, source: 'setting' } : wantedProgram(root);
+  const program = asked.program;
+  const label = PROGRAM_LABEL[program];
+  const latexmkProgram = program || MODE_PROGRAM[cfg.get('latexmkEngine')] || 'pdflatex';
+  const res = (name, bin, prog, note = '') => ({ name, bin, program: prog, source: asked.source, note });
+  const tectonicNote = program && program !== 'xelatex' ? `Tectonic always builds with XeLaTeX, so ${label} isn't used.` : '';
+
   // Inside a container we can't look for binaries; trust the image to have the one asked for.
-  if (docker) return { name: wanted === 'auto' ? 'latexmk' : wanted, bin: wanted === 'auto' ? 'latexmk' : wanted };
-  const order = wanted === 'auto' ? ['latexmk', 'tectonic', 'pdflatex'] : [wanted];
-  for (const name of order) {
-    const bin = which(name, PATH);
-    if (bin) return { name, bin };
+  if (docker) {
+    if (wanted === 'auto' || wanted === 'latexmk') return res('latexmk', 'latexmk', latexmkProgram);
+    if (wanted === 'tectonic') return res('tectonic', 'tectonic', 'xelatex', tectonicNote);
+    const p = program || wanted;
+    return res(p, p, p);
   }
-  return { name: wanted, bin: null };
+  if (wanted === 'latexmk') return res('latexmk', which('latexmk', PATH), latexmkProgram);
+  if (wanted === 'tectonic') return res('tectonic', which('tectonic', PATH), 'xelatex', tectonicNote);
+  if (PROGRAM_LABEL[wanted]) {
+    const p = program || wanted;
+    return res(p, which(p, PATH), p);
+  }
+
+  // auto: latexmk, then the program asked for, then Tectonic, then pdflatex.
+  const latexmk = which('latexmk', PATH);
+  if (latexmk) return res('latexmk', latexmk, latexmkProgram);
+  if (program) {
+    const bin = which(program, PATH);
+    if (bin) return res(program, bin, program);
+  }
+  const tectonic = which('tectonic', PATH);
+  if (tectonic) return res('tectonic', tectonic, 'xelatex', program && program !== 'xelatex' ? `${label} isn't installed; building with Tectonic (XeLaTeX) instead.` : '');
+  if (!program) {
+    const bin = which('pdflatex', PATH);
+    if (bin) return res('pdflatex', bin, 'pdflatex');
+  }
+  return res(program || 'auto', null, program);
+}
+
+/** "latexmk · XeLaTeX", "Tectonic", "pdfLaTeX": how a build is described to the user. */
+function engineLabel(engine) {
+  if (engine.name === 'latexmk') return `latexmk · ${PROGRAM_LABEL[engine.program]}`;
+  if (engine.name === 'tectonic') return 'Tectonic';
+  return PROGRAM_LABEL[engine.name] || engine.name;
+}
+
+// ---------------------------------------------------------------------------
+// TeX program picker (status bar and TeX menu)
+
+function updateProgramItem() {
+  const ed = vscode.window.activeTextEditor;
+  if (!ed || ed.document.uri.scheme !== 'file' || !/^(la)?tex$/.test(ed.document.languageId)) {
+    // Keep it while a non-text view (the preview, output…) has focus, like the TeX item.
+    if (ed) programItem.hide();
+    return;
+  }
+  const cfg = vscode.workspace.getConfiguration('texPreview');
+  if ((cfg.get('buildCommand') || '').trim()) {
+    programItem.text = '$(tools) Custom build';
+    programItem.tooltip = 'texPreview.buildCommand builds this project, so the TeX program setting is not used. Click to change.';
+    programItem.show();
+    return;
+  }
+  const root = resolveRoot(ed.document.uri.fsPath);
+  const engine = pickEngine(searchPath(), (cfg.get('docker.image') || '').trim(), root);
+  const from =
+    engine.source === 'magic'
+      ? `\`% !TEX program\` in ${path.basename(root)}`
+      : engine.source === 'setting'
+        ? 'the workspace setting'
+        : 'automatic';
+  const tip = new vscode.MarkdownString(
+    engine.bin
+      ? `TeX program: **${PROGRAM_LABEL[engine.program] || engine.name}** (${from}), built with ${engineLabel(engine)}.`
+      : `TeX program: **${PROGRAM_LABEL[engine.program] || 'automatic'}** (${from}). No compiler for it was found.`
+  );
+  if (engine.note) tip.appendMarkdown(`\n\n$(warning) ${engine.note}`);
+  tip.appendMarkdown('\n\nClick to change.');
+  tip.supportThemeIcons = true;
+  programItem.text = `${engine.note || !engine.bin ? '$(warning)' : '$(gear)'} ${PROGRAM_LABEL[engine.program] || 'TeX'}`;
+  programItem.tooltip = tip;
+  programItem.show();
+}
+
+/** The root file the picker applies to: the active editor's project, else the open preview's. */
+function programRoot() {
+  const ed = vscode.window.activeTextEditor;
+  if (ed && ed.document.uri.scheme === 'file' && /^(la)?tex$/.test(ed.document.languageId)) return resolveRoot(ed.document.uri.fsPath);
+  return activePreview()?.root || null;
+}
+
+async function selectProgram() {
+  const root = programRoot();
+  if (!root) {
+    vscode.window.showWarningMessage('TeX: open a .tex file first.');
+    return;
+  }
+  const cfg = vscode.workspace.getConfiguration('texPreview');
+  if ((cfg.get('buildCommand') || '').trim()) {
+    const open = await vscode.window.showWarningMessage(
+      'This project builds with texPreview.buildCommand, which decides the TeX program itself.',
+      'Open Setting'
+    );
+    if (open) vscode.commands.executeCommand('workbench.action.openSettings', 'texPreview.buildCommand');
+    return;
+  }
+  const PATH = searchPath();
+  const docker = (cfg.get('docker.image') || '').trim();
+  const magic = project.magicProgram(root);
+  const current = magic && PROGRAM_LABEL[magic.program] ? magic.program : null;
+  const setting = PROGRAM_LABEL[cfg.get('program')] ? cfg.get('program') : 'auto';
+  const rel = path.basename(root);
+  const mark = (on) => (on ? '$(check)' : '$(blank)');
+  const caveat = (p) => {
+    const e = pickEngine(PATH, docker, root, p);
+    if (!e.bin) return '$(warning) not installed';
+    return e.note ? `$(warning) ${e.note}` : `built with ${engineLabel(e)}`;
+  };
+  const programs = Object.keys(PROGRAM_LABEL);
+  const items = [
+    { label: `This document (${rel})`, kind: vscode.QuickPickItemKind.Separator },
+    ...programs.map((p) => ({ label: `${mark(current === p)} ${PROGRAM_LABEL[p]}`, description: caveat(p), scope: 'doc', program: p })),
+    ...(magic ? [{ label: '$(close) Remove % !TEX program', description: 'use the workspace default', scope: 'doc', program: null }] : []),
+    { label: current ? `Workspace default — overridden by % !TEX program in ${rel}` : 'Workspace default', kind: vscode.QuickPickItemKind.Separator },
+    {
+      label: `${mark(setting === 'auto')} Automatic`,
+      description: 'the first compiler found',
+      scope: 'ws',
+      program: 'auto',
+    },
+    ...programs.map((p) => ({ label: `${mark(setting === p)} ${PROGRAM_LABEL[p]}`, scope: 'ws', program: p })),
+  ];
+  const picked = await vscode.window.showQuickPick(items, {
+    title: 'TeX Program',
+    placeHolder: `For this document (adds % !TEX program to ${rel}) or the whole workspace`,
+  });
+  if (!picked) return;
+
+  if (picked.scope === 'doc') {
+    if (picked.program && picked.program === current) return;
+    await setMagicProgram(root, picked.program);
+  } else {
+    if (picked.program === setting) return;
+    const target = vscode.workspace.workspaceFolders ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+    await cfg.update('program', picked.program === 'auto' ? undefined : picked.program, target);
+    if (current) {
+      vscode.window.showInformationMessage(`${rel} still builds with ${PROGRAM_LABEL[current]}: its % !TEX program comment wins over the workspace default.`);
+    }
+  }
+  updateProgramItem();
+  // A saved root recompiles on its own when compile-on-save is on; a setting change doesn't.
+  const p = previews.get(root);
+  if (p && (picked.scope === 'ws' || !cfg.get('compileOnSave'))) p.compile();
+}
+
+/** Writes, replaces or (with program null) removes `% !TEX program = …` in `root`, then saves it. */
+async function setMagicProgram(root, program) {
+  const doc = await vscode.workspace.openTextDocument(root);
+  const existing = project.magicProgram(root);
+  const text = program ? `% !TEX program = ${program}` : null;
+  const edit = new vscode.WorkspaceEdit();
+  if (existing) {
+    const line = doc.lineAt(existing.line);
+    if (text) edit.replace(doc.uri, line.range, text);
+    else edit.delete(doc.uri, line.rangeIncludingLineBreak);
+  } else if (text) {
+    edit.insert(doc.uri, new vscode.Position(0, 0), text + (doc.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n'));
+  } else {
+    return;
+  }
+  if (await vscode.workspace.applyEdit(edit)) await doc.save();
+}
+
+/** Packages that pdfLaTeX can't build; a failed pdfLaTeX build of a root using one offers XeLaTeX. */
+const NEEDS_UNICODE_ENGINE = /\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\])?\s*\{[^}]*\b(fontspec|xeCJK|ctex|unicode-math|polyglossia|luatexja)\b|\\documentclass\s*(?:\[[^\]]*\])?\s*\{(ctex(?:art|rep|book|beamer))\}/;
+const offeredUnicodeEngine = new Set();
+
+function offerUnicodeEngine(root) {
+  if (offeredUnicodeEngine.has(root)) return;
+  const r = project.read(root);
+  const m = r && project.stripComments(r.text).match(NEEDS_UNICODE_ENGINE);
+  if (!m) return;
+  offeredUnicodeEngine.add(root);
+  const what = m[1] || m[2];
+  vscode.window
+    .showWarningMessage(`${path.basename(root)} uses ${what}, which needs XeLaTeX or LuaLaTeX, but it was built with pdfLaTeX.`, 'Use XeLaTeX for This Document', 'Choose…')
+    .then(async (choice) => {
+      if (choice === 'Choose…') return selectProgram();
+      if (!choice) return;
+      await setMagicProgram(root, 'xelatex');
+      updateProgramItem();
+      const p = previews.get(root);
+      if (p && !vscode.workspace.getConfiguration('texPreview').get('compileOnSave')) p.compile();
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -521,6 +744,95 @@ function parseLog(logText, rootFile, rootDir) {
 const SOURCE_EXT = /\.(tex|ltx|tikz|rnw|jnw|bbl)$/i;
 
 /**
+ * Missing-font errors (SimSun on macOS, a Windows ctex font set elsewhere…): explained, and moved
+ * to the line that chose the font. The error is often raised inside a package file such as
+ * ctex-fontset-windows.def, whose line number means nothing in the project's files.
+ */
+function explainFontErrors(items, root) {
+  const out = [];
+  const seen = new Set();
+  for (const it of items) {
+    // ctex's macOS font set always triggers this, and the output is fine.
+    if (it.severity === 'warning' && /does not contain requested\s+Script\s+"CJK"/.test(it.message)) continue;
+    const m = chinese.MISSING_FONT.exec(it.message);
+    if (!m) {
+      out.push(it);
+      continue;
+    }
+    if (seen.has(m[1])) continue; // tectonic reports it twice, from the console and the log
+    seen.add(m[1]);
+    let file = it.file;
+    let line = it.line;
+    for (const f of [it.file, root, ...project.projectFiles(root)]) {
+      const text = project.read(f)?.text;
+      const k = text ? chinese.fontErrorLine(text, m[1]) : -1;
+      if (k >= 0) {
+        file = f;
+        line = k + 1;
+        break;
+      }
+    }
+    const rootText = project.read(root)?.text || '';
+    out.push({ ...it, file, line, message: chinese.explainFont(it.message, rootText) || it.message, code: 'missing-font' });
+  }
+  return out;
+}
+
+/** Quick fixes for missing-font errors: another ctex font set, or this system's equivalent font. */
+class FontActions {
+  provideCodeActions(doc, range, ctx) {
+    const out = [];
+    for (const d of ctx.diagnostics) {
+      if (d.source !== 'LaTeX' || d.code !== 'missing-font') continue;
+      const font = (chinese.MISSING_FONT.exec(d.message) || [])[1];
+      if (!font) continue;
+      const text = doc.getText();
+      const fix = (title, apply, preferred) => {
+        const a = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+        a.edit = new vscode.WorkspaceEdit();
+        apply(a.edit);
+        a.diagnostics = [d];
+        a.isPreferred = !!preferred;
+        out.push(a);
+      };
+      const fs_ = chinese.ctexFontset(text);
+      const here = chinese.PLATFORM_FONTSET[process.platform] || 'fandol';
+      if (fs_ && fs_.fontset) {
+        const span = new vscode.Range(doc.positionAt(fs_.start), doc.positionAt(fs_.end));
+        if (fs_.fontset !== here) fix(`Use ctex fontset=${here} (this computer's fonts)`, (e) => e.replace(doc.uri, span, `fontset=${here}`), true);
+        if (fs_.fontset !== 'fandol' && here !== 'fandol') fix('Use ctex fontset=fandol (fonts included with TeX)', (e) => e.replace(doc.uri, span, 'fontset=fandol'));
+        // Remove "fontset=…" with the comma that joins it to its neighbours.
+        const opts = text.slice(fs_.optsStart, fs_.optsEnd);
+        const rel = [fs_.start - fs_.optsStart, fs_.end - fs_.optsStart];
+        const after = /^\s*,\s*/.exec(opts.slice(rel[1]));
+        const before = /\s*,\s*$/.exec(opts.slice(0, rel[0]));
+        const [a, b] = after ? [rel[0], rel[1] + after[0].length] : before ? [rel[0] - before[0].length, rel[1]] : rel;
+        // With no options left, drop the brackets too.
+        const all = a === 0 && b === opts.length;
+        const del = all ? [fs_.optsStart - 1, fs_.optsEnd + 1] : [fs_.optsStart + a, fs_.optsStart + b];
+        fix('Remove fontset= (let ctex pick fonts for this computer)', (e) => e.delete(doc.uri, new vscode.Range(doc.positionAt(del[0]), doc.positionAt(del[1]))));
+      } else if (chinese.usesCtex(text)) {
+        const m = /\\(?:documentclass|usepackage)\s*(\[[^\]]*\])?\s*\{ctex(?:art|rep|book|beamer)?\}/.exec(text);
+        if (m) {
+          const at = m.index + m[0].indexOf(m[1] ? '[' : '{');
+          fix('Use ctex fontset=fandol (fonts included with TeX)', (e) => e.insert(doc.uri, doc.positionAt(at + (m[1] ? 1 : 0)), m[1] ? 'fontset=fandol, ' : '[fontset=fandol]'), true);
+        }
+      }
+      const esc = font.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const uses = [...text.matchAll(new RegExp(`(?<=\\{\\s*)${esc}(?=\\s*\\})|(?<==\\s*)${esc}(?=\\s*[,\\]])`, 'g'))];
+      if (uses.length) {
+        chinese.fontAlternatives(font).forEach((alt, i) =>
+          fix(`Replace "${font}" with "${alt.font}" (${alt.why})`, (e) => {
+            for (const u of uses) e.replace(doc.uri, new vscode.Range(doc.positionAt(u.index), doc.positionAt(u.index + font.length)), alt.font);
+          }, i === 0 && !out.some((x) => x.isPreferred))
+        );
+      }
+    }
+    return out;
+  }
+}
+
+/**
  * For each log line, the file TeX was reading when it was written (absolute path, or null),
  * following TeX's "(./file.tex … )" nesting. Message blocks with free text (errors, over/underfull
  * boxes) are skipped so a stray parenthesis there can't throw the nesting off.
@@ -583,6 +895,8 @@ class Preview {
     this.panel = null;
     this.external = false; // also shown outside VS Code (browser or external viewer), so it outlives its panel
     this.clients = new Map(); // browser tabs: id -> { res, queue }
+    this.lastProgram = null; // TeX program of the last build, to notice a switch
+    this.shownNotes = new Set(); // engine notes already shown as notifications
   }
 
   addClient(id, res) {
@@ -805,18 +1119,20 @@ class Preview {
     const PATH = searchPath();
     const docker = (cfg.get('docker.image') || '').trim();
     const custom = (cfg.get('buildCommand') || '').trim();
-    const engine = custom ? { name: 'build command', bin: custom } : pickEngine(PATH, docker);
+    const engine = custom ? { name: 'build command', bin: custom } : pickEngine(PATH, docker, this.root);
     const name = path.basename(this.root);
 
     if (!engine.bin) {
       const msg =
         engine.name === 'auto'
           ? 'No LaTeX compiler found (looked for latexmk, tectonic, pdflatex).'
-          : `"${engine.name}" was not found on PATH.`;
+          : PROGRAM_LABEL[engine.name] && engine.source !== 'auto' && (cfg.get('engine') || 'auto') === 'auto'
+            ? `${PROGRAM_LABEL[engine.name]} was not found (looked for latexmk, ${engine.name} and tectonic).`
+            : `"${engine.name}" was not found on PATH.`;
       this.post({ type: 'status', state: 'error', message: msg, missingEngine: true, errors: [] });
       setStatus('$(error) TeX: no compiler', msg);
       // Offer the one-click install once per session (the preview also has a button for it).
-      if (!offeredInstall && !custom && !docker && (engine.name === 'auto' || engine.name === 'tectonic')) {
+      if (!offeredInstall && !custom && !docker && ((cfg.get('engine') || 'auto') === 'auto' || engine.name === 'tectonic')) {
         offeredInstall = true;
         installer.offerInstall(msg).then((ok) => ok && this.compile());
       }
@@ -826,11 +1142,22 @@ class Preview {
     fs.mkdirSync(this.outDir, { recursive: true });
     this.mirrorFolders();
     const started = Date.now();
-    this.post({ type: 'status', state: 'compiling', message: `Compiling with ${engine.name}…` });
-    setStatus('$(sync~spin) TeX: compiling', `Compiling ${name} with ${engine.name}`);
+    const using = custom ? engine.name : engineLabel(engine);
+    this.post({ type: 'status', state: 'compiling', message: `Compiling with ${using}…` });
+    setStatus('$(sync~spin) TeX: compiling', `Compiling ${name} with ${using}`);
 
     output.clear();
-    output.appendLine(`[tex-preview] ${new Date().toLocaleTimeString()}  ${this.root}`);
+    output.appendLine(`[tex-preview] ${new Date().toLocaleTimeString()}  ${this.root}  (${using})`);
+    if (engine.note) {
+      output.appendLine(`[tex-preview] ${engine.note}`);
+      if (!this.shownNotes.has(engine.note)) {
+        this.shownNotes.add(engine.note);
+        vscode.window.showWarningMessage(`TeX: ${engine.note}`, 'Change TeX Program…').then((c) => c && selectProgram());
+      }
+    }
+    // latexmk keeps its own record of what it ran; after switching programs, make it rebuild fully.
+    const switched = !custom && this.lastProgram && engine.program && this.lastProgram !== engine.program;
+    if (!custom) this.lastProgram = engine.program;
     const log = (s) => output.append(s);
     const env = { ...process.env, PATH, max_print_line: '10000', error_line: '254', half_error_line: '238' };
     const opts = {
@@ -878,20 +1205,21 @@ class Preview {
     if (custom) {
       result = await run(fill(custom, this), [], { ...opts, shell: true }, log);
     } else if (engine.name === 'latexmk') {
-      const mode = cfg.get('latexmkEngine') || 'pdf';
+      const mode = LATEXMK_MODE[engine.program] || 'pdf';
       result = await this.tool(
         engine.bin,
-        [`-${mode}`, ...latexFlags.filter((f) => f !== '-halt-on-error'), '-f', `-outdir=${outRel}`, file],
+        [`-${mode}`, ...latexFlags.filter((f) => f !== '-halt-on-error'), '-f', ...(switched ? ['-g'] : []), `-outdir=${outRel}`, file],
         opts
       );
       // MiKTeX ships latexmk, but it needs Perl, which Windows usually lacks. With engine "auto",
       // build with the next compiler instead of failing.
       const noPerl = /script engine|perl.*(not|couldn't|could not).*found|perl: not found|can't locate .*\.pm/i;
       if (!docker && (cfg.get('engine') || 'auto') === 'auto' && result.code !== 0 && !result.killed && gen === this.generation && noPerl.test(result.text)) {
-        const next = ['tectonic', 'pdflatex'].map((n) => ({ name: n, bin: which(n, PATH) })).find((e) => e.bin);
+        const next = [...new Set([engine.program, 'tectonic'])].map((n) => ({ name: n, bin: which(n, PATH) })).find((e) => e.bin);
         if (next) {
           log(`\n[tex-preview] latexmk can't run here (it needs Perl); building with ${next.name} instead.\n\n`);
           engine.name = next.name;
+          engine.program = next.name === 'tectonic' ? 'xelatex' : next.name;
           result =
             next.name === 'tectonic'
               ? await this.tool(next.bin, ['--keep-logs', '--synctex', '--outdir', outRel, file], opts)
@@ -910,7 +1238,7 @@ class Preview {
     // Tectonic also prints errors as "error: file:line: …"; the rest of its console output repeats
     // the log without file context, so only those lines are taken from it.
     const consoleErrors = engine.name === 'tectonic' ? result.text.split(/\r?\n/).filter((l) => /^(error|warning): [^:\s][^:]*\.\w+:\d+: /.test(l)).join('\n') : '';
-    const items = parseLog(logText + '\n\n' + consoleErrors, this.root, this.rootDir);
+    const items = explainFontErrors(parseLog(logText + '\n\n' + consoleErrors, this.root, this.rootDir), this.root);
     this.diagFiles = publishDiagnostics(items, this.root, this.diagFiles);
 
     const errors = items.filter((d) => d.severity === 'error');
@@ -945,6 +1273,7 @@ class Preview {
       errors: shownErrors,
     });
     if (!failed && pdfFresh) rating.builtOk();
+    if (failed && !custom && engine.program === 'pdflatex' && engine.source !== 'magic') offerUnicodeEngine(this.root);
     setStatus(
       failed ? '$(error) TeX: errors' : '$(check) TeX',
       failed ? 'Compile failed — click to show log' : `Compiled ${name} in ${secs}s`
@@ -1067,6 +1396,7 @@ function publishDiagnostics(items, root, previous = new Set()) {
       it.severity === 'error' ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning
     );
     d.source = 'LaTeX';
+    if (it.code) d.code = it.code;
     if (!byFile.has(it.file)) byFile.set(it.file, []);
     byFile.get(it.file).push(d);
   }

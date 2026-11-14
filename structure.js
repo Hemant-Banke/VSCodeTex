@@ -8,6 +8,7 @@ const path = require('path');
 const project = require('./project');
 const { stripComments, group } = project;
 const { mathSpans } = require('./math');
+const chinese = require('./chinese');
 
 const LEVELS = { part: 0, chapter: 1, section: 2, subsection: 3, subsubsection: 4, paragraph: 5, subparagraph: 6 };
 
@@ -363,19 +364,23 @@ function prose(text, bodyOnly) {
   return { text: s, math };
 }
 
-const WORD = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu;
+// CJK characters are counted one by one (as texcount and Overleaf do), so they're not word letters.
+const WL = `(?:${chinese.NON_CJK_LETTER}|\\p{N})`;
+const WORD = new RegExp(`${WL}+(?:['’-]${WL}+)*`, 'gu');
 
-/** Words of prose (math, commands, comments and labels excluded). */
+/** {words, cjk} of prose (math, commands, comments and labels excluded): words, and CJK characters. */
 function countWords(text, bodyOnly) {
-  return (prose(text, bodyOnly).text.match(WORD) || []).length;
+  const t = prose(text, bodyOnly).text;
+  return { words: (t.match(WORD) || []).length, cjk: chinese.cjkCount(t) };
 }
 
-/** {words, chars, charsNoSpaces, inlineMath, displayMath} for LaTeX source. */
+/** {words, cjk, chars, charsNoSpaces, inlineMath, displayMath} for LaTeX source. */
 function textStats(text, bodyOnly) {
   const p = prose(text, bodyOnly);
   const flat = p.text.replace(/\s+/g, ' ').trim();
   return {
     words: (p.text.match(WORD) || []).length,
+    cjk: chinese.cjkCount(p.text),
     chars: flat.length,
     charsNoSpaces: flat.replace(/\s/g, '').length,
     inlineMath: p.math.inline,

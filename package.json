@@ -2,7 +2,7 @@
   "name": "tex-side-preview",
   "displayName": "TeX Side Preview: LaTeX & Overleaf",
   "description": "Overleaf-style LaTeX in VS Code, Cursor and VSCodium: live PDF preview with SyncTeX, one-click compiler install, templates, citations from DOI/arXiv/Zotero, AI writing and review, comments and tracked changes, and two-way Overleaf sync.",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "publisher": "HemantBanke",
   "license": "MIT",
   "repository": {
@@ -90,6 +90,12 @@
         "title": "Jump to Location in PDF",
         "category": "TeX",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "texPreview.selectProgram",
+        "title": "Select TeX Program (pdfLaTeX / XeLaTeX / LuaLaTeX)…",
+        "category": "TeX",
+        "icon": "$(gear)"
       },
       {
         "command": "texPreview.overleaf.clone",
@@ -246,8 +252,17 @@
         "command": "texPreview.review.toggleTracking",
         "title": "Track Changes",
         "category": "TeX Review",
-        "icon": "$(record)",
-        "toggled": "texPreview.tracking"
+        "icon": "$(record)"
+      },
+      {
+        "command": "texPreview.review.toggleTracking.on",
+        "title": "Track Changes: On ✓",
+        "category": "TeX Review"
+      },
+      {
+        "command": "texPreview.review.toggleTracking.off",
+        "title": "Track Changes: Off",
+        "category": "TeX Review"
       },
       {
         "command": "texPreview.review.accept",
@@ -418,14 +433,52 @@
       {
         "command": "texPreview.spellcheck.toggle",
         "title": "Spell Check",
-        "category": "TeX",
-        "toggled": "config.texPreview.spellcheck.enabled"
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.spellcheck.toggle.on",
+        "title": "Spell Check: On ✓",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.spellcheck.toggle.off",
+        "title": "Spell Check: Off",
+        "category": "TeX"
       },
       {
         "command": "texPreview.grammar.toggle",
         "title": "Grammar Check (LanguageTool)",
-        "category": "TeX",
-        "toggled": "config.texPreview.grammar.enabled"
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.grammar.toggle.on",
+        "title": "Grammar Check (LanguageTool): On ✓",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.grammar.toggle.off",
+        "title": "Grammar Check (LanguageTool): Off",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.chinese.typography.toggle",
+        "title": "Chinese Typography Check",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.chinese.typography.toggle.on",
+        "title": "Chinese Typography Check: On ✓",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.chinese.typography.toggle.off",
+        "title": "Chinese Typography Check: Off",
+        "category": "TeX"
+      },
+      {
+        "command": "texPreview.chinese.fixAll",
+        "title": "Fix All Chinese Typography Issues in File",
+        "category": "TeX"
       },
       {
         "command": "texPreview.spellcheck.chooseLanguage",
@@ -521,6 +574,11 @@
           "command": "texPreview.downloadPdf",
           "when": "resourceExtname == .tex || editorLangId == latex",
           "group": "1_tex@2"
+        },
+        {
+          "command": "texPreview.selectProgram",
+          "when": "resourceExtname == .tex || editorLangId == latex",
+          "group": "1_tex@3"
         }
       ],
       "editor/title/context": [
@@ -585,6 +643,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "texPreview.selectProgram",
+          "when": "editorLangId =~ /^(la)?tex$/"
+        },
         {
           "command": "texPreview.open",
           "when": "resourceExtname == .tex || editorLangId == latex"
@@ -784,6 +846,46 @@
         {
           "command": "texPreview.ai.imageToLatex",
           "when": "editorLangId =~ /^(la)?tex$/"
+        },
+        {
+          "command": "texPreview.spellcheck.toggle.on",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.spellcheck.toggle.off",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.grammar.toggle.on",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.grammar.toggle.off",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.toggleTracking.on",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.review.toggleTracking.off",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.chinese.typography.toggle.on",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.chinese.typography.toggle.off",
+          "when": "false"
+        },
+        {
+          "command": "texPreview.chinese.fixAll",
+          "when": "texPreview.hasCJK"
+        },
+        {
+          "command": "texPreview.chinese.typography.toggle",
+          "when": "texPreview.hasCJK"
         }
       ],
       "texPreview.latex": [
@@ -985,8 +1087,14 @@
       ],
       "texPreview.reviewMenu": [
         {
-          "command": "texPreview.review.toggleTracking",
-          "group": "1_track@1"
+          "command": "texPreview.review.toggleTracking.on",
+          "group": "1_track@1",
+          "when": "texPreview.tracking"
+        },
+        {
+          "command": "texPreview.review.toggleTracking.off",
+          "group": "1_track@1",
+          "when": "!texPreview.tracking"
         },
         {
           "command": "texPreview.review.addComment",
@@ -1064,12 +1172,34 @@
       ],
       "texPreview.proofingMenu": [
         {
-          "command": "texPreview.spellcheck.toggle",
-          "group": "1_toggle@1"
+          "command": "texPreview.spellcheck.toggle.on",
+          "group": "1_toggle@1",
+          "when": "config.texPreview.spellcheck.enabled"
         },
         {
-          "command": "texPreview.grammar.toggle",
-          "group": "1_toggle@2"
+          "command": "texPreview.spellcheck.toggle.off",
+          "group": "1_toggle@1",
+          "when": "!config.texPreview.spellcheck.enabled"
+        },
+        {
+          "command": "texPreview.chinese.typography.toggle.on",
+          "when": "texPreview.hasCJK && config.texPreview.chinese.typography",
+          "group": "1_toggle@3"
+        },
+        {
+          "command": "texPreview.chinese.typography.toggle.off",
+          "when": "texPreview.hasCJK && !config.texPreview.chinese.typography",
+          "group": "1_toggle@3"
+        },
+        {
+          "command": "texPreview.grammar.toggle.on",
+          "group": "1_toggle@2",
+          "when": "config.texPreview.grammar.enabled"
+        },
+        {
+          "command": "texPreview.grammar.toggle.off",
+          "group": "1_toggle@2",
+          "when": "!config.texPreview.grammar.enabled"
         },
         {
           "command": "texPreview.spellcheck.chooseLanguage",
@@ -1079,6 +1209,11 @@
           "command": "texPreview.proofing.suggest",
           "group": "3_fix@1",
           "when": "texPreview.hasProofing"
+        },
+        {
+          "command": "texPreview.chinese.fixAll",
+          "when": "texPreview.hasCJK && config.texPreview.chinese.typography",
+          "group": "3_fix@1"
         }
       ]
     },
@@ -1295,7 +1430,24 @@
             "lualatex"
           ],
           "default": "auto",
-          "description": "Compiler to use. 'auto' picks the first available of latexmk, tectonic, pdflatex."
+          "description": "Build tool. 'auto' picks the first available of latexmk, tectonic, pdflatex (or the TeX program from texPreview.program / % !TEX program, before tectonic)."
+        },
+        "texPreview.program": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "pdflatex",
+            "xelatex",
+            "lualatex"
+          ],
+          "enumDescriptions": [
+            "Decided by texPreview.engine and texPreview.latexmkEngine.",
+            "pdfLaTeX.",
+            "XeLaTeX: Unicode and system fonts (fontspec, xeCJK, ctex).",
+            "LuaLaTeX: Unicode and system fonts (fontspec, luatexja)."
+          ],
+          "default": "auto",
+          "markdownDescription": "TeX program for this workspace: latexmk runs it (`-pdf`, `-xelatex`, `-lualatex`), otherwise it is run directly. A `% !TEX program = xelatex` line near the top of the main file wins over this, per document. Pick either from the TeX program item in the status bar."
         },
         "texPreview.latexmkEngine": {
           "type": "string",
@@ -1305,7 +1457,7 @@
             "lualatex"
           ],
           "default": "pdf",
-          "description": "Engine latexmk drives (-pdf, -xelatex or -lualatex)."
+          "markdownDescription": "Engine latexmk drives (-pdf, -xelatex or -lualatex) when `#texPreview.program#` is `auto` and the document has no `% !TEX program` line."
         },
         "texPreview.outDir": {
           "type": "string",
@@ -1395,7 +1547,7 @@
         "texPreview.spellcheck.language": {
           "type": "string",
           "default": "en-US",
-          "markdownDescription": "Spelling dictionary: `en-US` or `en-GB` (bundled), a Hunspell name like `de_DE` installed in a standard Hunspell folder, or the path of a `.dic` file. A file can choose its own with `% !TeX spellcheck = en_GB` in its first lines. Grammar checks use the same language."
+          "markdownDescription": "Spelling dictionary: `en-US` or `en-GB` (bundled), a Hunspell name like `de_DE` installed in a standard Hunspell folder, or the path of a `.dic` file. A file can choose its own with `% !TeX spellcheck = en_GB` in its first lines. Grammar checks use the same language, except that mostly-Chinese paragraphs are checked as Chinese. Chinese text is always checked against a list of common typos (错别字), whatever the language; `zh-CN` turns off English spelling."
         },
         "texPreview.spellcheck.words": {
           "type": "array",
@@ -1404,6 +1556,11 @@
           },
           "default": [],
           "markdownDescription": "Words to accept. **Add to dictionary** quick fixes add them here, in user or workspace settings (both lists are used)."
+        },
+        "texPreview.chinese.typography": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Check Chinese typography in text that has Chinese characters: half-width punctuation (`,` for `，`), straight quotes, `...` for `……`, doubled marks and stray spaces. Text without Chinese is never checked."
         },
         "texPreview.grammar.enabled": {
           "type": "boolean",
@@ -1483,6 +1640,32 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Add AI edits as tracked changes you can accept or reject, even when Track Changes is off. Off: AI edits are plain edits (undo with Ctrl/Cmd+Z)."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[latex]": {
+        "editor.unicodeHighlight.allowedLocales": {
+          "_os": true,
+          "_vscode": true,
+          "zh-hans": true,
+          "zh-hant": true
+        }
+      },
+      "[tex]": {
+        "editor.unicodeHighlight.allowedLocales": {
+          "_os": true,
+          "_vscode": true,
+          "zh-hans": true,
+          "zh-hant": true
+        }
+      },
+      "[bibtex]": {
+        "editor.unicodeHighlight.allowedLocales": {
+          "_os": true,
+          "_vscode": true,
+          "zh-hans": true,
+          "zh-hant": true
         }
       }
     },

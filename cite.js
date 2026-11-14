@@ -8,6 +8,7 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const project = require('./project');
+const chinese = require('./chinese');
 
 const isTex = (doc) => doc && (doc.languageId === 'latex' || doc.languageId === 'tex');
 const ZOTERO = 'http://127.0.0.1:23119/better-bibtex/cayw';
@@ -99,6 +100,10 @@ async function targetBib(file) {
     if (biblatex) {
       if (head >= 0) edit.insert(rootDoc.uri, rootDoc.positionAt(head), '\\addbibresource{references.bib}\n');
       edit.insert(rootDoc.uri, rootDoc.positionAt(end), '\\printbibliography\n\n');
+    } else if (chinese.usesCtex(text) || /\\usepackage\s*(\[[^\]]*\])?\s*\{[^}]*\bxeCJK\b/.test(text)) {
+      // Chinese documents: GB/T 7714-2015, which Chinese journals and theses require.
+      if (head >= 0 && !/\\usepackage\s*(\[[^\]]*\])?\s*\{gbt7714\}/.test(text)) edit.insert(rootDoc.uri, rootDoc.positionAt(head), '\\usepackage{gbt7714}\n');
+      edit.insert(rootDoc.uri, rootDoc.positionAt(end), '\\bibliographystyle{gbt7714-numerical}\n\\bibliography{references}\n\n');
     } else {
       edit.insert(rootDoc.uri, rootDoc.positionAt(end), '\\bibliographystyle{plain}\n\\bibliography{references}\n\n');
     }

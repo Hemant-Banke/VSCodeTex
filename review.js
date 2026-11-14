@@ -929,14 +929,18 @@ async function activate(ctx, opts = {}) {
   };
 
   const reg = (id, fn) => ctx.subscriptions.push(vscode.commands.registerCommand(id, fn));
-  reg('texPreview.review.toggleTracking', async () => {
+  const toggleTracking = async () => {
     const ed = vscode.window.activeTextEditor;
     await identity(ed ? path.dirname(ed.document.uri.fsPath) : undefined);
     await ctx.workspaceState.update('texPreview.review.tracking', !tracking());
     flushAll();
     renderStatus();
     vscode.window.setStatusBarMessage(tracking() ? `Track changes on: edits are recorded as suggestions by ${me.name}` : 'Track changes off', 3000);
-  });
+  };
+  reg('texPreview.review.toggleTracking', toggleTracking);
+  // The right-click menu's labels for the current state ("Track Changes: On ✓" / "Off").
+  reg('texPreview.review.toggleTracking.on', toggleTracking);
+  reg('texPreview.review.toggleTracking.off', toggleTracking);
   reg('texPreview.review.accept', (ids) => accept(Array.isArray(ids) ? ids : changeIdsAtCursor()));
   reg('texPreview.review.reject', (ids) => reject(Array.isArray(ids) ? ids : changeIdsAtCursor()));
   reg('texPreview.review.acceptAll', () => {

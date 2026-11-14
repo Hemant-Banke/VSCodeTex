@@ -13,6 +13,7 @@ const fs = require('fs');
 const os = require('os');
 const project = require('./project');
 const { mathSpans } = require('./math');
+const chinese = require('./chinese');
 
 const LATEX = [{ language: 'latex' }, { language: 'tex' }];
 const isTex = (doc) => doc && (doc.languageId === 'latex' || doc.languageId === 'tex');
@@ -303,7 +304,11 @@ function dictionaryFiles(lang) {
 }
 
 const dictionaries = new Map(); // language -> { spell, cache } | null
+/** zh-CN, ja, ko…: no Hunspell dictionary; CJK text gets the typo list and LanguageTool instead. */
+const isCJKLanguage = (lang) => /^(zh|ja|ko)([-_]|$)/i.test(path.basename(lang));
+
 function dictionary(lang) {
+  if (isCJKLanguage(lang)) return null;
   if (dictionaries.has(lang)) return dictionaries.get(lang);
   let d = null;
   const files = dictionaryFiles(lang);
@@ -349,7 +354,9 @@ function bibWords(doc) {
   return out;
 }
 
-const WORD = /\p{L}[\p{L}\p{M}]*(?:['’]\p{L}+)*/gu;
+// CJK has no spaces between words, so CJK runs aren't words here; chinese.typos checks them.
+const L = chinese.NON_CJK_LETTER;
+const WORD = new RegExp(`${L}(?:${L}|\\p{M})*(?:['’]${L}+)*`, 'gu');
 const SKIP_SPANS = /\b(?:https?:\/\/|www\.)\S+|\S+@\S+\.\w+/g;
 
 /** Misspelled words: [{a, b, word}] with reading-text offsets. */
@@ -446,17 +453,32 @@ function ltCheck(text, language) {
 }
 
 /** Checks the paragraphs of `doc` not checked before, publishing as results arrive. */
+/**
+ * Paragraphs with the LanguageTool language each is checked in: mostly-Chinese (or Japanese)
+ * paragraphs go to zh-CN (ja-JP), the rest to the file's language. An English file language for
+ * a CJK document is the default, so this is what makes grammar checks work in mixed documents.
+ */
+function grammarParagraphs(doc) {
+  const docLang = ltLanguage(languageOf(doc));
+  const base = isCJKLanguage(docLang) ? 'en-US' : docLang;
+  return paragraphs(reading(doc).text).map((p) => ({ ...p, lang: chinese.paragraphLanguage(p.text, base) }));
+}
+
 async function checkGrammar(doc, publish) {
-  const r = reading(doc);
-  const lang = ltLanguage(languageOf(doc));
-  const todo = paragraphs(r.text).filter((p) => !ltCache.has(lang + '\0' + p.text));
+  const todo = grammarParagraphs(doc).filter((p) => !ltCache.has(p.lang + '\0' + p.text));
   const { public: pub } = await ltServer();
   const max = pub ? 15000 : 60000;
   while (todo.length) {
+    // One language per request.
+    const lang = todo[0].lang;
     const batch = [];
     let size = 0;
-    while (todo.length && (!batch.length || size + todo[0].text.length + 2 <= max)) {
-      const p = todo.shift();
+    for (let i = 0; i < todo.length && (!batch.length || size + todo[i].text.length + 2 <= max); ) {
+      if (todo[i].lang !== lang) {
+        i++;
+        continue;
+      }
+      const p = todo.splice(i, 1)[0];
       batch.push({ ...p, base: size });
       size += p.text.length + 2;
     }
@@ -493,22 +515,85 @@ function spellCheck(doc) {
     updateContext();
     return;
   }
-  const dict = dictionary(languageOf(doc));
-  if (!dict) return;
+  const lang = languageOf(doc);
+  const dict = dictionary(lang);
   const r = reading(doc);
   const known = new Set([...userWords(), ...bibWords(doc)]);
-  const found = misspellings(r.text, dict, known).map((m) => ({ range: sourceRange(doc, r, m.a, m.b), word: m.word }));
+  if (!dict && !isCJKLanguage(lang) && !chinese.hasCJK(r.text)) return; // no dictionary, nothing else to check
+  const found = [
+    ...(dict ? misspellings(r.text, dict, known) : []),
+    ...chinese.typos(r.text, known).map((t) => ({ ...t, word: t.wrong })),
+  ]
+    .sort((x, y) => x.a - y.a)
+    .map((m) => ({ range: sourceRange(doc, r, m.a, m.b), word: m.word, right: m.right }));
   spellFound.set(doc.uri.toString(), found);
   updateContext();
-  const lang = languageOf(doc);
   spellDiags.set(
     doc.uri,
     found.map((f) => {
-      const d = new vscode.Diagnostic(f.range, `"${f.word}" is not in the ${lang} dictionary`, vscode.DiagnosticSeverity.Information);
+      const msg = f.right ? `"${f.word}" is a common misspelling of "${f.right}"` : `"${f.word}" is not in the ${lang} dictionary`;
+      const d = new vscode.Diagnostic(f.range, msg, f.right ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Information);
       d.source = 'Spelling';
       return d;
     })
   );
+}
+
+// ---------------------------------------------------------------------------
+// Chinese typography (only for text with CJK in it)
+
+let typoDiags;
+const typoFound = new Map(); // uri -> [{range, fix, message, rule}]
+
+function typographyCheck(doc) {
+  if (!config().get('chinese.typography')) {
+    typoDiags.delete(doc.uri);
+    typoFound.delete(doc.uri.toString());
+    updateContext();
+    return;
+  }
+  const r = reading(doc);
+  const src = doc.getText();
+  // Where a '"' of the reading text came from: `` opens, '' closes, a plain " is either.
+  const quoteAt = (k) => {
+    const s = src.slice(r.from[k], r.to[k]);
+    return s === '``' ? 'open' : s === "''" ? 'close' : null;
+  };
+  const found = [];
+  for (const t of chinese.typography(r.text, quoteAt)) {
+    const range = sourceRange(doc, r, t.a, t.b);
+    // Only issues in the text as written: never offer to rewrite markup.
+    if (MARKUP.test(doc.getText(range))) continue;
+    found.push({ ...t, range });
+  }
+  typoFound.set(doc.uri.toString(), found);
+  updateContext();
+  typoDiags.set(
+    doc.uri,
+    found.map((f) => {
+      const d = new vscode.Diagnostic(f.range, f.message, f.hint ? vscode.DiagnosticSeverity.Hint : vscode.DiagnosticSeverity.Information);
+      d.source = 'Chinese typography';
+      d.code = f.rule;
+      return d;
+    })
+  );
+}
+
+/** Applies every Chinese typography fix in `uri`'s document. */
+async function fixAllTypography(uri) {
+  const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === String(uri)) || vscode.window.activeTextEditor?.document;
+  if (!doc) return;
+  typographyCheck(doc);
+  const found = typoFound.get(doc.uri.toString()) || [];
+  if (!found.length) return vscode.window.setStatusBarMessage('No Chinese typography issues in this file', 3000);
+  const edit = new vscode.WorkspaceEdit();
+  let last = null;
+  for (const f of found) {
+    if (last && f.range.start.isBefore(last)) continue; // overlapping (e.g. a space next to a fixed mark)
+    edit.replace(doc.uri, f.range, f.fix);
+    last = f.range.end;
+  }
+  await vscode.workspace.applyEdit(edit);
 }
 
 /** LanguageTool's own dictionary spell checkers, left out since Hunspell checks spelling. (Other
@@ -518,11 +603,10 @@ const SPELLER = /^(MORFOLOGIK_RULE|HUNSPELL_RULE|HUNSPELL_NO_SUGGEST_RULE|[A-Z_]
 function publishGrammar(doc) {
   if (doc.isClosed) return;
   const r = reading(doc);
-  const lang = ltLanguage(languageOf(doc));
   const disabled = new Set(config().get('grammar.disabledRules') || []);
   const found = [];
-  for (const p of paragraphs(r.text)) {
-    for (const m of ltCache.get(lang + '\0' + p.text) || []) {
+  for (const p of grammarParagraphs(doc)) {
+    for (const m of ltCache.get(p.lang + '\0' + p.text) || []) {
       if (SPELLER.test(m.rule?.id || '') || disabled.has(m.rule?.id)) continue;
       found.push({ range: sourceRange(doc, r, p.start + m.offset, p.start + m.offset + m.length), match: m });
     }
@@ -557,6 +641,7 @@ function grammarCheck(doc) {
 const PROOFING = vscode.CodeActionKind.QuickFix.append('proofing');
 const SPELLING = PROOFING.append('spelling');
 const GRAMMAR = PROOFING.append('grammar');
+const TYPOGRAPHY = PROOFING.append('typography');
 
 const sameRange = (a, b) => a.start.isEqual(b.start) && a.end.isEqual(b.end);
 const MARKUP = /[\\{}$%]/;
@@ -570,7 +655,14 @@ class ProofingActions {
         const f = (spellFound.get(key) || []).find((x) => sameRange(x.range, d.range));
         if (!f) continue;
         const dict = dictionary(languageOf(doc));
-        if (dict && !MARKUP.test(doc.getText(d.range))) {
+        if (f.right && !MARKUP.test(doc.getText(d.range))) {
+          const a = new vscode.CodeAction(`Change to "${f.right}"`, SPELLING);
+          a.edit = new vscode.WorkspaceEdit();
+          a.edit.replace(doc.uri, d.range, f.right);
+          a.diagnostics = [d];
+          a.isPreferred = true;
+          out.push(a);
+        } else if (dict && !MARKUP.test(doc.getText(d.range))) {
           const sugg = suggestions(dict, f.word);
           sugg.forEach((s, i) => {
             const a = new vscode.CodeAction(`Change to "${s}"`, SPELLING);
@@ -589,6 +681,23 @@ class ProofingActions {
         };
         add(`Add "${f.word}" to user dictionary`, 'user');
         if (vscode.workspace.workspaceFolders) add(`Add "${f.word}" to workspace dictionary`, 'workspace');
+      } else if (d.source === 'Chinese typography') {
+        const f = (typoFound.get(key) || []).find((x) => sameRange(x.range, d.range) && x.message === d.message);
+        if (!f) continue;
+        const a = new vscode.CodeAction(f.fix ? `Change to "${f.fix}"` : 'Remove the space', TYPOGRAPHY);
+        a.edit = new vscode.WorkspaceEdit();
+        a.edit.replace(doc.uri, d.range, f.fix);
+        a.diagnostics = [d];
+        a.isPreferred = true;
+        out.push(a);
+        if (!out.some((x) => x.title.startsWith('Fix all Chinese'))) {
+          const all = new vscode.CodeAction('Fix all Chinese typography issues in this file', TYPOGRAPHY);
+          all.command = { command: 'texPreview.chinese.fixAll', title: all.title, arguments: [doc.uri.toString()] };
+          out.push(all);
+          const off = new vscode.CodeAction('Turn off Chinese typography checks', TYPOGRAPHY);
+          off.command = { command: 'texPreview.chinese.typography.toggle', title: off.title };
+          out.push(off);
+        }
       } else if (d.source === 'LanguageTool') {
         const f = (grammarFound.get(key) || []).find((x) => sameRange(x.range, d.range) && x.match.message === d.message);
         if (!f) continue;
@@ -622,9 +731,14 @@ class ProofingActions {
 let hasProofing = false;
 function updateContext() {
   const key = vscode.window.activeTextEditor?.document.uri.toString();
-  const now = !!key && ((spellFound.get(key) || []).length > 0 || (grammarFound.get(key) || []).length > 0);
+  const now = !!key && [spellFound, grammarFound, typoFound].some((m) => (m.get(key) || []).length > 0);
   if (now !== hasProofing) vscode.commands.executeCommand('setContext', 'texPreview.hasProofing', (hasProofing = now));
+  // texPreview.hasCJK: the active file has Chinese/Japanese text, which shows the Chinese entries.
+  const doc = vscode.window.activeTextEditor?.document;
+  const cjk = !!doc && isTex(doc) && chinese.hasCJK(reading(doc).text);
+  if (cjk !== hasCJK) vscode.commands.executeCommand('setContext', 'texPreview.hasCJK', (hasCJK = cjk));
 }
+let hasCJK = false;
 
 /** VS Code's quick-fix menu at the cursor, with only spelling and grammar fixes. */
 function showSuggestions() {
@@ -640,6 +754,11 @@ function targetOf(key) {
 async function toggleSpelling() {
   await config().update('spellcheck.enabled', !config().get('spellcheck.enabled'), targetOf('spellcheck.enabled'));
   vscode.window.setStatusBarMessage(`Spell check ${config().get('spellcheck.enabled') ? 'on' : 'off'}`, 3000);
+}
+
+async function toggleTypography() {
+  await config().update('chinese.typography', !config().get('chinese.typography'), targetOf('chinese.typography'));
+  vscode.window.setStatusBarMessage(`Chinese typography check ${config().get('chinese.typography') ? 'on' : 'off'}`, 3000);
 }
 
 async function toggleGrammar(context) {
@@ -670,6 +789,7 @@ async function chooseLanguage() {
   const items = [
     { label: 'en-US', description: 'English (US), bundled' },
     { label: 'en-GB', description: 'English (UK), bundled' },
+    { label: 'zh-CN', description: 'Chinese: no English spelling; grammar in Chinese. (Chinese typos are checked with any language.)' },
   ];
   for (const dir of HUNSPELL_DIRS) {
     let names = [];
@@ -712,6 +832,7 @@ async function disableRule(id) {
 function activate(context) {
   secrets = context.secrets;
   spellDiags = vscode.languages.createDiagnosticCollection('tex-spelling');
+  typoDiags = vscode.languages.createDiagnosticCollection('tex-chinese-typography');
   grammarDiags = vscode.languages.createDiagnosticCollection('tex-grammar');
   const timers = new Map();
   const schedule = (doc, kind, delay) => {
@@ -722,7 +843,11 @@ function activate(context) {
       k,
       setTimeout(() => {
         timers.delete(k);
-        if (!doc.isClosed) (kind === 's' ? spellCheck : grammarCheck)(doc);
+        if (doc.isClosed) return;
+        if (kind === 's') {
+          spellCheck(doc);
+          typographyCheck(doc);
+        } else grammarCheck(doc);
       }, delay)
     );
   };
@@ -735,7 +860,14 @@ function activate(context) {
   context.subscriptions.push(
     spellDiags,
     grammarDiags,
-    vscode.languages.registerCodeActionsProvider(LATEX, new ProofingActions(), { providedCodeActionKinds: [SPELLING, GRAMMAR] }),
+    typoDiags,
+    vscode.languages.registerCodeActionsProvider(LATEX, new ProofingActions(), { providedCodeActionKinds: [SPELLING, GRAMMAR, TYPOGRAPHY] }),
+    vscode.commands.registerCommand('texPreview.chinese.fixAll', fixAllTypography),
+    // The .on/.off twins are the right-click menu's labels for the current state.
+    ...['', '.on', '.off'].flatMap((v) => [
+      vscode.commands.registerCommand(`texPreview.chinese.typography.toggle${v}`, toggleTypography),
+      ...(v ? [vscode.commands.registerCommand(`texPreview.spellcheck.toggle${v}`, toggleSpelling), vscode.commands.registerCommand(`texPreview.grammar.toggle${v}`, () => toggleGrammar(context))] : []),
+    ]),
     vscode.commands.registerCommand('texPreview.spellcheck.addWord', addWord),
     vscode.commands.registerCommand('texPreview.proofing.suggest', showSuggestions),
     vscode.commands.registerCommand('texPreview.spellcheck.toggle', toggleSpelling),
@@ -755,12 +887,14 @@ function activate(context) {
     vscode.workspace.onDidCloseTextDocument((d) => {
       spellDiags.delete(d.uri);
       grammarDiags.delete(d.uri);
+      typoDiags.delete(d.uri);
+      typoFound.delete(d.uri.toString());
       spellFound.delete(d.uri.toString());
       grammarFound.delete(d.uri.toString());
     }),
     vscode.window.onDidChangeVisibleTextEditors((eds) => eds.forEach((e) => schedule(e.document, 'g', 500))),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('texPreview.spellcheck') || e.affectsConfiguration('texPreview.grammar')) all();
+      if (['spellcheck', 'grammar', 'chinese'].some((k) => e.affectsConfiguration(`texPreview.${k}`))) all();
     }),
     { dispose: () => timers.forEach(clearTimeout) }
   );

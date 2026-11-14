@@ -252,6 +252,20 @@ function magicRoot(file) {
   return fs.existsSync(target) ? target : null;
 }
 
+const MAGIC_PROGRAM = /^\s*%\s*!\s*TEX\s+(?:TS-)?program\s*=\s*([A-Za-z]*)/i;
+
+/** `% !TEX program = xelatex` (or `TS-program`) in the first 30 lines: { program, line } (0-based) or null. */
+function magicProgram(file) {
+  const r = read(file);
+  if (!r) return null;
+  const lines = r.text.split(/\r?\n/, 30);
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(MAGIC_PROGRAM);
+    if (m) return { program: m[1].toLowerCase(), line: i };
+  }
+  return null;
+}
+
 /**
  * The main file for `file`: a `% !TEX root` comment wins; a file with \documentclass is its own
  * root; otherwise the nearest file (same folder, then parents within the workspace) whose
@@ -355,4 +369,4 @@ function forget(file) {
   diskCache.delete(file);
 }
 
-module.exports = { read, stripComments, group, parseBib, cleanBibValue, ACCENTS, findRoot, projectFiles, resolveTex, project, info, bibLine, forget, lineStarts, lineOf };
+module.exports = { read, stripComments, group, parseBib, cleanBibValue, ACCENTS, findRoot, magicProgram, projectFiles, resolveTex, project, info, bibLine, forget, lineStarts, lineOf };

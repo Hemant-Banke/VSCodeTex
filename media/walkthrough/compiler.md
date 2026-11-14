@@ -16,4 +16,6 @@ TeX Side Preview builds with whichever of these it finds first:
 - Windows: [MiKTeX](https://miktex.org/download) or [TeX Live](https://tug.org/texlive/windows.html)
 - Linux: `sudo apt install texlive-full latexmk`
 
+**pdfLaTeX, XeLaTeX or LuaLaTeX?** Click the TeX program item in the status bar. A choice for *this document* adds `% !TEX program = xelatex` to its first line; that's handy for Chinese, Japanese or system-font documents next to pdfLaTeX ones. Tectonic always uses XeLaTeX.
+
 You can also build in Docker (`texPreview.docker.image`) or with your own command (`texPreview.buildCommand`).

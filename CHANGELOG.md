@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.2
+- **Choose pdfLaTeX, XeLaTeX or LuaLaTeX from the status bar.** The new TeX program item shows what a document builds with; click it to pick a program for this document (adds `% !TEX program = …`, which also works for files from TeXShop, TeXstudio and LaTeX Workshop) or for the workspace (`texPreview.program`). latexmk runs the chosen program, and the first build after a switch is a full rebuild. Also in the TeX menu, the editor title menu and **TeX: Select TeX Program…**.
+- A pdfLaTeX build that fails on a document using `fontspec`, `xeCJK`, `ctex` or similar offers to switch that document to XeLaTeX.
+- **Chinese documents** (only text with Chinese characters is affected):
+  - Spell check no longer underlines every Chinese sentence as a misspelt word. Chinese text is checked against a list of common typos (错别字, e.g. 再接再励 → 再接再厉) with one-click fixes.
+  - Grammar checks send mostly-Chinese paragraphs to LanguageTool as Chinese (的/地/得, typos); English paragraphs are still checked as English.
+  - New typography check: half-width punctuation, straight quotes, `...`, doubled marks and stray spaces in Chinese text, with fixes and **Fix all** (`texPreview.chinese.typography`).
+  - Word count counts Chinese, Japanese and Korean characters one by one ("5,678 CJK · 120 words"); before, a whole sentence counted as one word.
+  - Missing-font errors (SimSun on macOS…) are explained on the line that chose the font, with quick fixes for ctex's `fontset=` or this system's equivalent font.
+  - ctex's harmless `Font "STSong" does not contain requested Script "CJK"` warning on macOS is no longer shown on line 1 of every Chinese document.
+  - New templates: Chinese article, thesis, slides and CV (ctex, XeLaTeX, GB/T 7714).
+  - Chinese punctuation (，；：？！（）) in `.tex` and `.bib` files is no longer boxed by VS Code as "confusable with ASCII" when the system language isn't Chinese.
+  - Add Citation sets up GB/T 7714 references in Chinese documents; `\bibliographystyle{` suggests styles; `ctex`, `xeCJK` and `gbt7714` in package suggestions.
+- On/off items in the right-click menu (Spell Check, Grammar Check, Track Changes) now say *On ✓* or *Off*; their checkmarks never showed before.
+- Forward SyncTeX (Jump to Location in PDF) in two-column documents (IEEEtran, `twocolumn`…) highlights the line instead of the whole page, and scrolls to it.
+
 ## 1.4.1
 - SyncTeX (Jump to Location in PDF, double-click in the PDF) works for projects whose folder or file names have non-ASCII characters on Windows, where TeX writes the paths in the system code page (GBK, Big5, Shift-JIS…) instead of UTF-8 ([#1](https://github.com/Hemant-Banke/VSCodeTex/issues/1)).
 
